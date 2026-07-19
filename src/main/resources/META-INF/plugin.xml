@@ -1,0 +1,26 @@
+<idea-plugin>
+    <id>com.aprender.template</id>
+    <name>Android Studio Template (Hilt + Retrofit + Room)</name>
+    <vendor email="developer@aprenderandroid.com">AprenderDesarrolloAndroid</vendor>
+
+    <description><![CDATA[
+    Plugin for Android Studio that integrates into the "New Project" wizard under Phone and Tablet to generate clean architecture Android projects pre-configured with:
+    <ul>
+        <li><b>Dagger Hilt</b> (Dependency Injection)</li>
+        <li><b>Retrofit</b> + kotlinx.serialization (Networking)</li>
+        <li><b>Room</b> (Local Database & DAOs)</li>
+        <li><b>Clean Architecture</b> (Data, Domain, UI with Jetpack Compose & Material3)</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.android</depends>
+
+    <!-- Único mecanismo que Android Studio usa para poblar la galería de New Project.
+         Los extension points genéricos de IntelliJ (moduleBuilder, newProjectWizard, etc.)
+         no se muestran en el asistente de Android Studio. -->
+    <extensions defaultExtensionNs="com.android.tools.idea.wizard.template">
+        <wizardTemplateProvider
+            implementation="com.aprender.template.wizard.AndroidStudioWizardTemplateProvider"/>
+    </extensions>
+</idea-plugin>

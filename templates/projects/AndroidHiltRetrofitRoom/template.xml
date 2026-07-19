@@ -1,0 +1,30 @@
+<template
+    format="5"
+    revision="1"
+    name="Android (Hilt + Retrofit + Room)"
+    description="Creates a clean architecture Android project pre-configured with Dagger Hilt, Retrofit, Room, and Jetpack Compose."
+    minApi="26"
+    minBuildApi="35">
+
+    <category value="Application" />
+    <formfactor value="Mobile" />
+
+    <parameter
+        id="appTitle"
+        name="Application name"
+        type="string"
+        constraints="nonempty"
+        default="My Android App"
+        help="The name of your application" />
+
+    <parameter
+        id="packageName"
+        name="Package name"
+        type="string"
+        constraints="package"
+        default="com.example.myandroidapp"
+        help="The package name for your application" />
+
+    <globals file="globals.xml.ftl" />
+    <execute file="recipe.xml.ftl" />
+</template>

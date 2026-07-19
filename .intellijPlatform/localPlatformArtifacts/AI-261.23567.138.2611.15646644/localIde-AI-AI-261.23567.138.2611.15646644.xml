@@ -1,0 +1,10 @@
+<ivy-module version="2.0">
+  <info organisation="localIde" module="AI" revision="AI-261.23567.138.2611.15646644"/>
+  <configurations>
+    <conf name="default" visibility="public"/>
+  </configurations>
+  <publications>
+    <artifact name="home/victor/.local/share/JetBrains/Toolbox/apps/android-studio" ext="directory" conf="default"/>
+  </publications>
+  <dependencies/>
+</ivy-module>

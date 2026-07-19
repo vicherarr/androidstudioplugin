@@ -1,0 +1,30 @@
+<ivy-module version="2.0">
+  <info organisation="bundledPlugin" module="org.jetbrains.plugins.gradle" revision="AI-261.23567.138.2611.15646644"/>
+  <configurations>
+    <conf name="default" visibility="public"/>
+  </configurations>
+  <publications>
+    <artifact name="gradle-java-plugin" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib"/>
+    <artifact name="gradle-jps" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib"/>
+    <artifact name="intellij.gradle.java.groovy.toml" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.groovy.ml" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.groovy" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.performance" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.properties" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.toml" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+    <artifact name="intellij.gradle.java.coverage" ext="jar" conf="default" url="plugins/gradle-java-plugin/lib/modules"/>
+  </publications>
+  <dependencies>
+    <dependency org="bundledModule" name="intellij.java.indexing" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.ui" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.platform.jps.build" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.compiler" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.compiler.impl" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.debugger.impl" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.execution" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.execution.impl" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.java.impl" rev="AI-261.23567.138.2611.15646644"/>
+    <dependency org="bundledModule" name="intellij.properties.backend.psi" rev="AI-261.23567.138.2611.15646644"/>
+  </dependencies>
+</ivy-module>
