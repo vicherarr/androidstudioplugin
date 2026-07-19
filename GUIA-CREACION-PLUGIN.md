@@ -5,7 +5,266 @@ para crear uno similar partiendo de cero: requisitos, lenguaje, estructura, APIs
 proceso de compilación, instalación y los errores típicos (todos los de este documento
 nos pasaron de verdad durante el desarrollo).
 
+### Cómo leer esta guía
+
+La guía está dividida en dos partes:
+
+- **Parte A — Para principiantes.** Empieza aquí si nunca has programado. Explica los
+  conceptos básicos, qué herramientas instalar y cómo, y unos pasos numerados y
+  secuenciales para construir e instalar el plugin sin dar nada por sabido.
+- **Parte B — Referencia técnica.** El detalle fino de cada fichero, cada API y cada
+  error. Léela cuando ya tengas lo básico funcionando o si quieres entender el *por qué*
+  de cada decisión.
+
+No hace falta leerlo todo de golpe. Si solo quieres **usar** el plugin, con la Parte A
+te sobra.
+
 ---
+
+---
+
+# PARTE A — Para quien nunca ha programado
+
+## A.0 Un vistazo general: ¿qué vas a hacer exactamente?
+
+Antes de instalar nada, ten clara la idea de fondo, porque es más simple de lo que
+parece. Crear este plugin es como **cocinar con una receta**:
+
+1. Escribes unos **ficheros de texto** (el "código" y la "configuración"). Son texto
+   normal, como un documento de Word pero sin formato.
+2. Ejecutas **una sola orden** en la terminal. Una herramienta (Gradle) lee esos
+   ficheros y los "cocina": los convierte en un archivo **`.zip`**. A ese paso se le
+   llama **compilar**.
+3. Ese `.zip` es el plugin terminado. Lo **instalas** dentro de Android Studio (como
+   quien instala una extensión en el navegador) y **reinicias**.
+4. A partir de ahí, al crear un proyecto nuevo aparece tu plantilla.
+
+Todo lo demás de esta guía son detalles de esos cuatro pasos. No necesitas entender
+todo el código para que funcione: necesitas los ficheros correctos en su sitio y
+ejecutar la orden de compilar.
+
+## A.1 Glosario mínimo (palabras que se repiten)
+
+No te saltes esto: si estas palabras te suenan, el resto se entiende solo.
+
+- **Código fuente / código:** los ficheros de texto que escribe un programador. Son las
+  "instrucciones" del programa. En este proyecto están en la carpeta `src/`.
+- **Lenguaje de programación:** el idioma en el que se escribe el código. Aquí usamos
+  **Kotlin** (y algo de configuración en otros formatos). Es el mismo lenguaje con el
+  que se hacen apps de Android hoy en día.
+- **Compilar:** traducir el código que tú escribes (texto para humanos) a un formato
+  que la máquina entiende y puede ejecutar. Lo hace una herramienta, tú solo das la
+  orden. El resultado aquí es el `.zip` del plugin.
+- **JVM (Java Virtual Machine):** un "motor" que ejecuta programas hechos en Java o
+  Kotlin. Android Studio funciona sobre ella y tu plugin también.
+- **JDK (Java Development Kit):** el paquete que necesitas instalar para *compilar*
+  programas de Java/Kotlin. Incluye la JVM más las herramientas de compilación. Sin un
+  JDK no puedes construir el plugin. Necesitas la **versión 21**.
+- **IDE (Entorno de Desarrollo Integrado):** el programa donde se escribe y prueba
+  código. **Android Studio es un IDE.** Aquí es a la vez la herramienta y el objetivo:
+  desarrollas un plugin *para* Android Studio.
+- **Plugin:** un complemento que añade funciones a un programa. El nuestro añade una
+  plantilla nueva al asistente de "New Project" de Android Studio.
+- **Gradle:** la herramienta que compila el proyecto. Tú le das una orden
+  (`./gradlew buildPlugin`) y ella hace todo el trabajo pesado.
+- **Gradle wrapper (`gradlew`):** un pequeño lanzador incluido *dentro* del proyecto que
+  **descarga e instala la versión correcta de Gradle por ti** la primera vez. Gracias a
+  él **no tienes que instalar Gradle a mano**. Es el fichero `gradlew` (Linux/Mac) o
+  `gradlew.bat` (Windows) que ves en la raíz.
+- **Terminal (o línea de comandos / consola):** una ventana donde escribes órdenes de
+  texto en lugar de hacer clic. Da un poco de respeto al principio, pero aquí solo la
+  usarás para escribir una o dos líneas. Más abajo se explica cómo abrirla.
+- **Git y GitHub:** Git es una herramienta para guardar el historial de cambios de tu
+  código; GitHub es una web para almacenar ese código en la nube y compartirlo. **Es
+  opcional**: solo lo necesitas si quieres subir tu proyecto a internet.
+
+## A.2 Las herramientas que necesitas instalar
+
+Son pocas. Esta tabla resume qué instalar y para qué; el "cómo" viene justo después.
+
+| Herramienta | ¿Para qué sirve? | ¿Obligatoria? |
+|---|---|---|
+| **Android Studio** | Es el programa al que le añades el plugin y, además, trae dentro un JDK que puedes reutilizar para compilar | **Sí** |
+| **JDK 21** (Java) | Compilar el plugin. **Puedes usar el que ya viene dentro de Android Studio**, así te ahorras instalarlo aparte | **Sí** (pero suele venir con Android Studio) |
+| **Gradle** | Compilar el proyecto | **No hace falta instalarlo**: el `gradlew` del proyecto lo descarga solo |
+| **La terminal** | Escribir la orden de compilar | **Sí**, pero ya viene con tu sistema operativo |
+| **Git** | Subir el código a GitHub | **No**, solo si quieres compartirlo online |
+
+Fíjate en lo importante: de "instalaciones" reales, en la práctica **solo instalas
+Android Studio**. El JDK viene dentro y Gradle se descarga solo.
+
+## A.3 Instalación paso a paso
+
+### Paso 1 — Instalar Android Studio
+
+1. Entra en la página oficial: **https://developer.android.com/studio**
+2. Pulsa el botón de descarga. La web detecta tu sistema (Windows, macOS o Linux).
+3. Instálalo:
+   - **Windows:** ejecuta el `.exe` descargado y sigue el asistente (Siguiente →
+     Siguiente → Instalar).
+   - **macOS:** abre el `.dmg` y arrastra Android Studio a la carpeta *Aplicaciones*.
+   - **Linux:** descomprime el `.tar.gz` en una carpeta (por ejemplo tu carpeta
+     personal) y ejecuta `bin/studio.sh`. Alternativa recomendada en Linux: instalar
+     **JetBrains Toolbox** y desde ahí instalar Android Studio (así se actualiza solo).
+4. Ábrelo una vez y deja que termine su configuración inicial (descarga componentes de
+   Android; puede tardar). Con esto ya tienes el IDE **y** un JDK dentro de él.
+
+> 💡 Android Studio incluye su propio Java, llamado **JBR** (JetBrains Runtime), en una
+> subcarpeta `jbr` dentro de donde lo instalaste. Ese JBR sirve perfectamente como
+> JDK 21 para compilar el plugin, así no tienes que instalar Java por separado.
+
+### Paso 2 — Localizar el JDK (el Java de Android Studio)
+
+Necesitas saber **la ruta** de ese JBR, porque se la darás a la orden de compilar.
+Según dónde instalaste Android Studio, la carpeta `jbr` suele estar en:
+
+- **Windows:** `C:\Program Files\Android\Android Studio\jbr`
+- **macOS:** `/Applications/Android Studio.app/Contents/jbr`
+- **Linux (Toolbox):** `~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr`
+- **Linux (manual):** dentro de la carpeta donde descomprimiste, subcarpeta `jbr`
+
+Guarda esa ruta, la usarás en el Paso 5. (Si prefieres no complicarte con rutas, en el
+Paso 5 se explica la alternativa de instalar un JDK 21 "normal".)
+
+### Paso 3 — (Opcional) Instalar Git
+
+Solo si vas a subir el proyecto a GitHub:
+
+- **Windows:** descarga e instala desde **https://git-scm.com/download/win**
+- **macOS:** abre la terminal y escribe `git --version`; si no lo tienes, el sistema te
+  ofrecerá instalarlo. O instálalo con Homebrew: `brew install git`.
+- **Linux:** con el gestor de paquetes de tu distribución, p. ej. `sudo pacman -S git`
+  (Arch/CachyOS) o `sudo apt install git` (Ubuntu/Debian).
+
+### Paso 4 — Saber abrir la terminal
+
+La "terminal" es la ventana donde escribirás la orden de compilar:
+
+- **Windows:** pulsa la tecla Windows, escribe `PowerShell` o `Terminal` y ábrelo.
+- **macOS:** pulsa `Cmd + Espacio`, escribe `Terminal` y pulsa Enter.
+- **Linux:** normalmente `Ctrl + Alt + T`, o busca "Terminal" en tus aplicaciones.
+
+Dentro de la terminal, dos órdenes que usarás constantemente:
+
+- `cd <carpeta>` → "entrar en" una carpeta (change directory). Ej: `cd Descargas`.
+- `ls` (Linux/Mac) o `dir` (Windows) → listar lo que hay en la carpeta actual.
+
+## A.4 Comprobar que todo está listo (antes de compilar)
+
+Abre la terminal y comprueba que el Java de Android Studio funciona. Sustituye la ruta
+por la tuya del Paso 2. Ejemplo en Linux con Toolbox:
+
+```bash
+~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr/bin/java -version
+```
+
+En Windows (PowerShell) sería algo como:
+
+```powershell
+& "C:\Program Files\Android\Android Studio\jbr\bin\java.exe" -version
+```
+
+Si ves un texto tipo `openjdk version "21..."`, ¡perfecto! Ya puedes compilar. Si da
+error de "no se encuentra", revisa la ruta del Paso 2.
+
+## A.5 Construir e instalar ESTE plugin, paso a paso
+
+Estos pasos parten de que ya tienes la carpeta del proyecto (este mismo repositorio).
+Si lo bajaste de GitHub como `.zip`, descomprímelo primero.
+
+1. **Abre la terminal** (Paso 4 de arriba).
+
+2. **Entra en la carpeta del proyecto** con `cd`. Por ejemplo, si está en tu carpeta
+   personal:
+   ```bash
+   cd ~/develop/AndroidStudioTemplate
+   ```
+   (En Windows sería p. ej. `cd C:\Users\TuUsuario\Downloads\AndroidStudioTemplate`.)
+   Para confirmar que estás en el sitio correcto, lista los ficheros (`ls` o `dir`):
+   debes ver `build.gradle.kts`, `gradlew`, la carpeta `src`, etc.
+
+3. **Lanza la compilación.** Esta única orden hace *todo*. En Linux/macOS, poniendo
+   delante la ruta al Java de Android Studio (la del Paso 2):
+   ```bash
+   JAVA_HOME=~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr ./gradlew buildPlugin
+   ```
+   En Windows (PowerShell):
+   ```powershell
+   $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; .\gradlew.bat buildPlugin
+   ```
+   La **primera vez tardará varios minutos**: Gradle se descarga a sí mismo y baja las
+   dependencias. Es normal. Cuando termine bien, verás el mensaje **`BUILD SUCCESSFUL`**.
+
+   > Si `JAVA_HOME` te resulta lioso: instala un **JDK 21** normal (Eclipse Temurin,
+   > desde https://adoptium.net) y así podrás ejecutar solo `./gradlew buildPlugin` sin
+   > la parte de `JAVA_HOME` delante.
+
+4. **Encuentra el plugin ya compilado.** Se ha creado aquí:
+   ```
+   build/distributions/AndroidStudioTemplate-1.0.0.zip
+   ```
+   Ese `.zip` **es tu plugin**. (Debe pesar unos pocos KB; si pesa más de 1 MB, algo va
+   mal — mira la Parte B, §8.1.)
+
+5. **Instálalo en Android Studio:**
+   1. Abre Android Studio.
+   2. Ve a **Settings** (⚙️) → **Plugins**.
+   3. Pulsa el icono del engranaje ⚙️ (arriba, junto a "Installed") → **Install Plugin
+      from Disk...**.
+   4. Selecciona el `.zip` del paso 4.
+   5. Pulsa **OK** y luego **Restart IDE** para reiniciar.
+
+6. **Pruébalo.** Tras reiniciar: **File → New → New Project...**. En la pestaña
+   **Phone and Tablet**, baja hasta el final de la galería: ahí está
+   **"Android (Hilt + Retrofit + Room)"**. Selecciónala, pon nombre y paquete, y crea
+   el proyecto.
+
+¡Eso es todo! Si algo no aparece, ve a la Parte B, §8.3 (tabla de errores comunes) y a
+§8.4 (cómo mirar el registro `idea.log` para ver qué pasó).
+
+## A.6 Si quieres crear TU PROPIO plugin desde cero
+
+Cuando ya hayas conseguido compilar este, crear uno tuyo es repetir el patrón con tus
+ficheros. El esqueleto mínimo son solo estos ficheros (los detalles de cada uno están
+en la Parte B, que te indico entre paréntesis):
+
+1. **`build.gradle.kts`** — la "receta de compilación": qué versión de Android Studio y
+   qué herramientas usar. (Copia el de este proyecto y ajústalo → Parte B, §5.)
+2. **`gradle.properties`** — un par de ajustes. (§5.)
+3. **`settings.gradle.kts`** + la carpeta **`gradle/wrapper/`** y el fichero
+   **`gradlew`** — el lanzador de Gradle. (Lo más fácil: copiarlos tal cual de este
+   proyecto.)
+4. **`src/main/resources/META-INF/plugin.xml`** — la "ficha de identidad" del plugin:
+   su nombre, su id y qué función del IDE extiende. (§6.)
+5. **`src/main/kotlin/.../TuProveedor.kt`** — el código Kotlin que define tu plantilla y
+   qué ficheros genera. (§7.)
+
+El orden recomendado para trabajar:
+
+1. Copia este proyecto entero a una carpeta nueva y renómbralo. Así partes de algo que
+   ya compila, en vez de la página en blanco.
+2. Cambia el `id`, el `name` y el `vendor` en `plugin.xml`.
+3. Cambia el texto de la plantilla (`name`, `description`) en el proveedor `.kt`.
+4. Cambia lo que genera: edita `ProjectGenerator.kt` / `FileTemplates.kt` para que
+   escriba los ficheros que tú quieras.
+5. Compila y prueba con `./gradlew buildPlugin` cada vez que hagas un cambio, o usa
+   `./gradlew runIde` (Parte B, §8.4) para abrir un Android Studio de pruebas con tu
+   plugin ya cargado, sin tocar tu instalación real.
+
+> ⚠️ **La regla de oro** (se explica a fondo en la Parte B, §5): un plugin de plantillas
+> hay que compilarlo **contra la misma versión de Android Studio** donde lo vas a usar.
+> Si actualizas Android Studio a una versión mayor, tendrás que **recompilar y volver a
+> instalar** el plugin. Es la causa nº 1 de "lo instalé pero no aparece".
+
+---
+
+---
+
+# PARTE B — Referencia técnica
+
+> A partir de aquí la guía entra en detalle: la arquitectura interna, cada API, cada
+> fichero y los errores con su explicación. Si vienes de la Parte A y algo no te suena,
+> no pasa nada: úsala como diccionario de consulta.
 
 ## 1. ¿Qué es exactamente este plugin?
 
