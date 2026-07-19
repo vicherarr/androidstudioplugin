@@ -9,6 +9,8 @@ import com.android.tools.idea.wizard.template.WizardTemplateProvider
 import com.android.tools.idea.wizard.template.WizardUiContext
 import com.android.tools.idea.wizard.template.template
 import com.aprender.template.generator.ProjectGenerator
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 
 class AndroidStudioWizardTemplateProvider : WizardTemplateProvider() {
     override fun getTemplates(): List<Template> {
@@ -27,12 +29,32 @@ val androidHiltRetrofitRoomTemplate: Template
 
         recipe = { data: TemplateData ->
             val moduleData = data as ModuleTemplateData
-            // El asistente estándar de Android Studio ya pide Name / Package name /
-            // Minimum SDK, así que se reutilizan esos valores en lugar de duplicar campos.
-            ProjectGenerator.generate(
-                targetDir = moduleData.projectTemplateData.rootDir,
-                appName = moduleData.themesData.appName,
-                packageName = moduleData.packageName
-            )
+
+            // El asistente ejecuta el recipe dos veces: una pasada de validación con
+            // FindReferencesRecipeExecutor (que NO debe tocar el disco) y la pasada real.
+            // Escribir ficheros en la pasada de validación deja el build.gradle.kts raíz
+            // fuera del VFS y el render de Android Studio aborta con "Build model for
+            // root project not found", dejando el proyecto sin vincular a Gradle.
+            if (!javaClass.simpleName.contains("FindReferences")) {
+                val rootDir = moduleData.projectTemplateData.rootDir
+
+                // El asistente estándar ya pide Name / Package name / Minimum SDK;
+                // se reutilizan esos valores en lugar de duplicar campos.
+                ProjectGenerator.generate(
+                    targetDir = rootDir,
+                    appName = moduleData.themesData.appName,
+                    packageName = moduleData.packageName
+                )
+
+                // Los ficheros se escriben con java.io fuera del VFS; hay que marcar el
+                // directorio como sucio para que el IDE recargue el estado real del disco
+                // antes de vincular e importar el proyecto Gradle.
+                val vRoot = LocalFileSystem.getInstance().findFileByIoFile(rootDir)
+                if (vRoot != null) {
+                    VfsUtil.markDirtyAndRefresh(true, true, true, vRoot)
+                } else {
+                    LocalFileSystem.getInstance().refreshIoFiles(listOf(rootDir))
+                }
+            }
         }
     }

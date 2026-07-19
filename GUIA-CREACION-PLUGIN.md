@@ -501,11 +501,19 @@ val androidHiltRetrofitRoomTemplate: Template
 
         recipe = { data: TemplateData ->
             val moduleData = data as ModuleTemplateData
-            ProjectGenerator.generate(
-                targetDir = moduleData.projectTemplateData.rootDir,
-                appName = moduleData.themesData.appName,
-                packageName = moduleData.packageName
-            )
+            // Solo escribir en la pasada REAL, nunca en la de validación (ver §7.3)
+            if (!javaClass.simpleName.contains("FindReferences")) {
+                val rootDir = moduleData.projectTemplateData.rootDir
+                ProjectGenerator.generate(
+                    targetDir = rootDir,
+                    appName = moduleData.themesData.appName,
+                    packageName = moduleData.packageName
+                )
+                // Refrescar el VFS para que el IDE vea lo escrito con java.io
+                LocalFileSystem.getInstance().findFileByIoFile(rootDir)?.let {
+                    VfsUtil.markDirtyAndRefresh(true, true, true, it)
+                }
+            }
         }
     }
 ```
@@ -538,11 +546,33 @@ Conceptos:
 (build.gradle.kts, manifest, clases Kotlin del proyecto generado...) como funciones
 que devuelven strings, interpolando `packageName` y `appName`.
 
-Es la aproximación más simple posible. La alternativa "canónica" es usar los métodos
-del `RecipeExecutor` (`save()`, `createDirectory()`, `addDependency()`...), que se
-integran mejor con el sistema de ficheros virtual del IDE, pero escribir con
-`java.io.File` funciona porque el IDE refresca e importa el proyecto Gradle al
-terminar el asistente.
+Es la aproximación más simple posible, pero escribir con `java.io.File` tiene **dos
+trampas serias** que descubrimos a base de golpes:
+
+1. **El recipe se ejecuta DOS veces.** El asistente hace primero una pasada de
+   *validación* ("dry run") con un executor especial (`FindReferencesRecipeExecutor`)
+   que se supone que no toca el disco — los métodos del `RecipeExecutor` (`save()`,
+   etc.) no hacen nada en esa pasada, pero `java.io.File` escribe igual. Resultado:
+   los ficheros aparecen en disco *antes de tiempo*, fuera del VFS (el sistema de
+   ficheros virtual del IDE). Cuando después Android Studio genera su propio scaffold,
+   ve que `build.gradle.kts` "ya existe" pero no está en el VFS, y su generador de
+   módulos aborta con `IllegalStateException: Build model for root project not found`.
+   El síntoma: el proyecto se crea, los ficheros están en *Project Files*, pero la
+   vista *Project* sale vacía y nunca se lanza la sincronización de Gradle. Por eso el
+   recipe comprueba el tipo del executor y **solo escribe en la pasada real**.
+
+2. **El IDE no ve lo que escribes.** El VFS trabaja con una caché; los ficheros
+   escritos con `java.io` no existen para el IDE hasta que se refresca. De ahí el
+   `VfsUtil.markDirtyAndRefresh(...)` al final del recipe.
+
+La alternativa "canónica" (la que usan las plantillas integradas de Android Studio) es
+hacerlo todo con los métodos del `RecipeExecutor`: `save()` para ficheros nuevos,
+`mergeXml()` para fusionar manifests/recursos, `addPlugin()`/`addDependency()` para
+tocar los build files. Esos métodos son inmunes a los dos problemas de arriba (no
+hacen nada en el dry run y escriben vía VFS), pero tienen una limitación: `save()`
+**nunca sobreescribe** un fichero existente, así que no sirven si tu plantilla quiere
+reemplazar por completo los build files que genera el scaffold estándar, como hace
+esta. Elige según tu caso.
 
 ---
 
@@ -578,6 +608,7 @@ reiniciar. En Linux: `~/.local/share/Google/AndroidStudio<versión>/`.
 | `Unresolved reference 'trimIndent'` al compilar | `kotlin.stdlib.default.dependency=false` sin stdlib alternativa en el classpath | Añadir `compileOnly(kotlin("stdlib"))` |
 | `Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0/2.4.0...` | El compilador Kotlin del proyecto es más antiguo que el usado para compilar el IDE (solo puede leer metadatos hasta N+1) | Subir el Kotlin Gradle Plugin (aquí: 2.3.0 para leer metadatos 2.4 de Quail) |
 | Registrar `moduleBuilder` / `newProjectWizard` y no ver nada | Android Studio no muestra el asistente genérico de IntelliJ | Eliminarlos; solo vale `wizardTemplateProvider` |
+| El proyecto se crea pero la vista *Project* sale vacía (solo un `scratch.kts`), no hay sync de Gradle; en `idea.log`: `IllegalStateException: Build model for root project not found` | El recipe escribió con `java.io.File` durante la pasada de validación (dry run) del asistente, dejando los build files fuera del VFS y rompiendo el render de Android Studio | Escribir solo en la pasada real (comprobar que el executor no es `FindReferencesRecipeExecutor`) y refrescar el VFS al terminar (§7.3) |
 
 ### 8.4 Depurar
 
