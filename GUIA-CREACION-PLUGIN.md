@@ -43,42 +43,7 @@ Todo lo demás de esta guía son detalles de esos cuatro pasos. No necesitas ent
 todo el código para que funcione: necesitas los ficheros correctos en su sitio y
 ejecutar la orden de compilar.
 
-## A.1 Glosario mínimo (palabras que se repiten)
-
-No te saltes esto: si estas palabras te suenan, el resto se entiende solo.
-
-- **Código fuente / código:** los ficheros de texto que escribe un programador. Son las
-  "instrucciones" del programa. En este proyecto están en la carpeta `src/`.
-- **Lenguaje de programación:** el idioma en el que se escribe el código. Aquí usamos
-  **Kotlin** (y algo de configuración en otros formatos). Es el mismo lenguaje con el
-  que se hacen apps de Android hoy en día.
-- **Compilar:** traducir el código que tú escribes (texto para humanos) a un formato
-  que la máquina entiende y puede ejecutar. Lo hace una herramienta, tú solo das la
-  orden. El resultado aquí es el `.zip` del plugin.
-- **JVM (Java Virtual Machine):** un "motor" que ejecuta programas hechos en Java o
-  Kotlin. Android Studio funciona sobre ella y tu plugin también.
-- **JDK (Java Development Kit):** el paquete que necesitas instalar para *compilar*
-  programas de Java/Kotlin. Incluye la JVM más las herramientas de compilación. Sin un
-  JDK no puedes construir el plugin. Necesitas la **versión 21**.
-- **IDE (Entorno de Desarrollo Integrado):** el programa donde se escribe y prueba
-  código. **Android Studio es un IDE.** Aquí es a la vez la herramienta y el objetivo:
-  desarrollas un plugin *para* Android Studio.
-- **Plugin:** un complemento que añade funciones a un programa. El nuestro añade una
-  plantilla nueva al asistente de "New Project" de Android Studio.
-- **Gradle:** la herramienta que compila el proyecto. Tú le das una orden
-  (`./gradlew buildPlugin`) y ella hace todo el trabajo pesado.
-- **Gradle wrapper (`gradlew`):** un pequeño lanzador incluido *dentro* del proyecto que
-  **descarga e instala la versión correcta de Gradle por ti** la primera vez. Gracias a
-  él **no tienes que instalar Gradle a mano**. Es el fichero `gradlew` (Linux/Mac) o
-  `gradlew.bat` (Windows) que ves en la raíz.
-- **Terminal (o línea de comandos / consola):** una ventana donde escribes órdenes de
-  texto en lugar de hacer clic. Da un poco de respeto al principio, pero aquí solo la
-  usarás para escribir una o dos líneas. Más abajo se explica cómo abrirla.
-- **Git y GitHub:** Git es una herramienta para guardar el historial de cambios de tu
-  código; GitHub es una web para almacenar ese código en la nube y compartirlo. **Es
-  opcional**: solo lo necesitas si quieres subir tu proyecto a internet.
-
-## A.2 Las herramientas que necesitas instalar
+## A.1 Las herramientas que necesitas instalar
 
 Son pocas. Esta tabla resume qué instalar y para qué; el "cómo" viene justo después.
 
@@ -93,7 +58,7 @@ Son pocas. Esta tabla resume qué instalar y para qué; el "cómo" viene justo d
 Fíjate en lo importante: de "instalaciones" reales, en la práctica **solo instalas
 Android Studio**. El JDK viene dentro y Gradle se descarga solo.
 
-## A.3 Instalación paso a paso
+## A.2 Instalación paso a paso
 
 ### Paso 1 — Instalar Android Studio
 
@@ -149,7 +114,7 @@ Dentro de la terminal, dos órdenes que usarás constantemente:
 - `cd <carpeta>` → "entrar en" una carpeta (change directory). Ej: `cd Descargas`.
 - `ls` (Linux/Mac) o `dir` (Windows) → listar lo que hay en la carpeta actual.
 
-## A.4 Comprobar que todo está listo (antes de compilar)
+## A.3 Comprobar que todo está listo (antes de compilar)
 
 Abre la terminal y comprueba que el Java de Android Studio funciona. Sustituye la ruta
 por la tuya del Paso 2. Ejemplo en Linux con Toolbox:
@@ -167,7 +132,7 @@ En Windows (PowerShell) sería algo como:
 Si ves un texto tipo `openjdk version "21..."`, ¡perfecto! Ya puedes compilar. Si da
 error de "no se encuentra", revisa la ruta del Paso 2.
 
-## A.5 Construir e instalar ESTE plugin, paso a paso
+## A.4 Construir e instalar ESTE plugin, paso a paso
 
 Estos pasos parten de que ya tienes la carpeta del proyecto (este mismo repositorio).
 Si lo bajaste de GitHub como `.zip`, descomprímelo primero.
@@ -222,7 +187,7 @@ Si lo bajaste de GitHub como `.zip`, descomprímelo primero.
 ¡Eso es todo! Si algo no aparece, ve a la Parte B, §8.3 (tabla de errores comunes) y a
 §8.4 (cómo mirar el registro `idea.log` para ver qué pasó).
 
-## A.6 Si quieres crear TU PROPIO plugin desde cero
+## A.5 Si quieres crear TU PROPIO plugin desde cero
 
 Cuando ya hayas conseguido compilar este, crear uno tuyo es repetir el patrón con tus
 ficheros. El esqueleto mínimo son solo estos ficheros (los detalles de cada uno están
