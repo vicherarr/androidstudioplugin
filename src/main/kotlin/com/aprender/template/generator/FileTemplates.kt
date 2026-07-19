@@ -133,6 +133,7 @@ object FileTemplates {
             }
             buildFeatures {
                 compose = true
+                buildConfig = true
             }
         }
 
@@ -330,7 +331,7 @@ object FileTemplates {
     """.trimIndent()
 
     fun getItemRepositoryKt(packageName: String): String = """
-        package $packageName.data.repository
+        package $packageName.domain.repository
 
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
@@ -347,6 +348,7 @@ object FileTemplates {
         import $packageName.data.local.dao.ItemDao
         import $packageName.data.local.entity.ItemEntity
         import $packageName.data.remote.api.ApiService
+        import $packageName.domain.repository.ItemRepository
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
         import kotlinx.coroutines.flow.map
@@ -416,10 +418,8 @@ object FileTemplates {
     fun getNetworkModuleKt(packageName: String): String = """
         package $packageName.di
 
+        import $packageName.BuildConfig
         import $packageName.data.remote.api.ApiService
-        import $packageName.data.repository.ItemRepository
-        import $packageName.data.repository.ItemRepositoryImpl
-        import dagger.Binds
         import dagger.Module
         import dagger.Provides
         import dagger.hilt.InstallIn
@@ -430,62 +430,81 @@ object FileTemplates {
         import okhttp3.logging.HttpLoggingInterceptor
         import retrofit2.Retrofit
         import retrofit2.converter.kotlinx.serialization.asConverterFactory
+        import java.util.concurrent.TimeUnit
         import javax.inject.Singleton
 
         @Module
         @InstallIn(SingletonComponent::class)
-        abstract class NetworkModule {
+        object NetworkModule {
+
+            private const val BASE_URL = "https://jsonplaceholder.typicode.com/"
+
+            @Provides
+            @Singleton
+            fun provideJson(): Json = Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+            }
+
+            @Provides
+            @Singleton
+            fun provideOkHttpClient(): OkHttpClient {
+                return OkHttpClient.Builder()
+                    .addInterceptor(HttpLoggingInterceptor().apply {
+                        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+                    })
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
+                    .writeTimeout(15, TimeUnit.SECONDS)
+                    .build()
+            }
+
+            @Provides
+            @Singleton
+            fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
+                val contentType = "application/json".toMediaType()
+                return Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .client(okHttpClient)
+                    .addConverterFactory(json.asConverterFactory(contentType))
+                    .build()
+            }
+
+            @Provides
+            @Singleton
+            fun provideApiService(retrofit: Retrofit): ApiService {
+                return retrofit.create(ApiService::class.java)
+            }
+        }
+    """.trimIndent()
+
+    fun getRepositoryModuleKt(packageName: String): String = """
+        package $packageName.di
+
+        import $packageName.data.repository.ItemRepositoryImpl
+        import $packageName.domain.repository.ItemRepository
+        import dagger.Binds
+        import dagger.Module
+        import dagger.hilt.InstallIn
+        import dagger.hilt.components.SingletonComponent
+        import javax.inject.Singleton
+
+        @Module
+        @InstallIn(SingletonComponent::class)
+        abstract class RepositoryModule {
 
             @Binds
             @Singleton
             abstract fun bindItemRepository(
                 impl: ItemRepositoryImpl
             ): ItemRepository
-
-            companion object {
-                private const val BASE_URL = "https://jsonplaceholder.typicode.com/"
-
-                @Provides
-                @Singleton
-                fun provideJson(): Json = Json {
-                    ignoreUnknownKeys = true
-                    coerceInputValues = true
-                }
-
-                @Provides
-                @Singleton
-                fun provideOkHttpClient(): OkHttpClient {
-                    return OkHttpClient.Builder()
-                        .addInterceptor(HttpLoggingInterceptor().apply {
-                            level = HttpLoggingInterceptor.Level.BODY
-                        })
-                        .build()
-                }
-
-                @Provides
-                @Singleton
-                fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
-                    val contentType = "application/json".toMediaType()
-                    return Retrofit.Builder()
-                        .baseUrl(BASE_URL)
-                        .client(okHttpClient)
-                        .addConverterFactory(json.asConverterFactory(contentType))
-                        .build()
-                }
-
-                @Provides
-                @Singleton
-                fun provideApiService(retrofit: Retrofit): ApiService {
-                    return retrofit.create(ApiService::class.java)
-                }
-            }
         }
     """.trimIndent()
 
     fun getGetItemsUseCaseKt(packageName: String): String = """
         package $packageName.domain.usecase
 
-        import $packageName.data.repository.ItemRepository
+        import $packageName.domain.repository.ItemRepository
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
         import javax.inject.Inject
@@ -824,9 +843,9 @@ object FileTemplates {
 
         ## Package Structure
         `$packageName`
-        - `data/`: Repositories, DAOs, Database, Entities, API Service, DTOs
-        - `di/`: Hilt modules (`DatabaseModule`, `NetworkModule`)
-        - `domain/`: Business models and UseCases
+        - `data/`: Repository implementations, DAOs, Database, Entities, API Service, DTOs
+        - `di/`: Hilt modules (`DatabaseModule`, `NetworkModule`, `RepositoryModule`)
+        - `domain/`: Business models, Repository interfaces, and UseCases
         - `ui/`: Compose Screens, ViewModels, UiState, Theme
 
     """.trimIndent()

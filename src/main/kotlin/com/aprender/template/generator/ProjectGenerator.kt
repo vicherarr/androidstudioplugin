@@ -55,15 +55,16 @@ object ProjectGenerator {
         writeFile(File(codeDir, "data/remote/dto/ItemDto.kt"), FileTemplates.getItemDtoKt(packageName))
         writeFile(File(codeDir, "data/remote/api/ApiService.kt"), FileTemplates.getApiServiceKt(packageName))
 
-        writeFile(File(codeDir, "data/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "data/repository/ItemRepositoryImpl.kt"), FileTemplates.getItemRepositoryImplKt(packageName))
 
         // DI layer
         writeFile(File(codeDir, "di/DatabaseModule.kt"), FileTemplates.getDatabaseModuleKt(packageName))
         writeFile(File(codeDir, "di/NetworkModule.kt"), FileTemplates.getNetworkModuleKt(packageName))
+        writeFile(File(codeDir, "di/RepositoryModule.kt"), FileTemplates.getRepositoryModuleKt(packageName))
 
         // Domain layer
         writeFile(File(codeDir, "domain/model/Item.kt"), FileTemplates.getItemKt(packageName))
+        writeFile(File(codeDir, "domain/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemsUseCase.kt"), FileTemplates.getGetItemsUseCaseKt(packageName))
 
         // UI layer
