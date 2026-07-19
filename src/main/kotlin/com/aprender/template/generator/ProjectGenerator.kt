@@ -17,6 +17,10 @@ object ProjectGenerator {
         writeFile(File(targetDir, ".gitignore"), FileTemplates.getGitIgnore())
         writeFile(File(targetDir, "README.md"), FileTemplates.getReadme(appName, packageName))
 
+        // Sobreescrituras del scaffold de Android Studio que romperían el build
+        writeFile(File(targetDir, "gradle.properties"), FileTemplates.getGradleProperties())
+        writeFile(File(targetDir, "gradle/wrapper/gradle-wrapper.properties"), FileTemplates.getGradleWrapperProperties())
+
         // gradle/libs.versions.toml
         val gradleDir = File(targetDir, "gradle")
         writeFile(File(gradleDir, "libs.versions.toml"), FileTemplates.getLibsVersionsToml())
@@ -34,6 +38,7 @@ object ProjectGenerator {
         val resValuesDir = File(mainDir, "res/values")
         writeFile(File(resValuesDir, "strings.xml"), FileTemplates.getStringXml(appName))
         writeFile(File(resValuesDir, "themes.xml"), FileTemplates.getThemesXml())
+        writeFile(File(mainDir, "res/values-night/themes.xml"), FileTemplates.getThemesNightXml())
 
         // app/src/main/java/<packagePath>
         val codeDir = File(mainDir, "java/$packagePath")

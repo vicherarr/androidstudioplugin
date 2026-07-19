@@ -42,7 +42,7 @@ object FileTemplates {
 
     fun getLibsVersionsToml(): String = """
         [versions]
-        agp = "8.8.2"
+        agp = "8.11.1"
         kotlin = "2.1.21"
         ksp = "2.1.21-2.0.2"
         hilt = "2.58"
@@ -50,10 +50,10 @@ object FileTemplates {
         kotlinxSerialization = "1.8.1"
         okhttp = "4.12.0"
         room = "2.8.4"
-        coreKtx = "1.15.0"
-        lifecycleRuntimeKtx = "2.8.7"
-        activityCompose = "1.10.0"
-        composeBom = "2025.02.00"
+        coreKtx = "1.16.0"
+        lifecycleRuntimeKtx = "2.9.1"
+        activityCompose = "1.10.1"
+        composeBom = "2025.06.00"
         hiltNavigationCompose = "1.2.0"
 
         [libraries]
@@ -82,7 +82,7 @@ object FileTemplates {
 
         [plugins]
         android-application = { id = "com.android.application", version.ref = "agp" }
-        kotlin-android = { id = "com.android.kotlin.android", version.ref = "kotlin" }
+        kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
         kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
         kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
         hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
@@ -103,12 +103,12 @@ object FileTemplates {
 
         android {
             namespace = "$packageName"
-            compileSdk = 35
+            compileSdk = 36
 
             defaultConfig {
                 applicationId = "$packageName"
                 minSdk = 26
-                targetSdk = 35
+                targetSdk = 36
                 versionCode = 1
                 versionName = "1.0"
 
@@ -763,6 +763,36 @@ object FileTemplates {
         <resources>
             <style name="Theme.App" parent="android:Theme.Material.Light.NoActionBar" />
         </resources>
+    """.trimIndent()
+
+    // Sobreescribe el values-night/themes.xml del scaffold de Android Studio, que
+    // referencia Theme.MaterialComponents (librería que esta plantilla no incluye)
+    fun getThemesNightXml(): String = """
+        <resources>
+            <style name="Theme.App" parent="android:Theme.Material.NoActionBar" />
+        </resources>
+    """.trimIndent()
+
+    // Sobreescribe el gradle.properties del scaffold, que no activa AndroidX
+    fun getGradleProperties(): String = """
+        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        org.gradle.configuration-cache=true
+        kotlin.code.style=official
+        # AndroidX (obligatorio para dependencias androidx.*)
+        android.useAndroidX=true
+        android.nonTransitiveRClass=true
+    """.trimIndent()
+
+    // Fija el wrapper a Gradle 8.13: el scaffold de Android Studio Quail pone 9.x,
+    // incompatible con AGP 8.11 (el jar del wrapper descarga la versión indicada aquí)
+    fun getGradleWrapperProperties(): String = """
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
     """.trimIndent()
 
     fun getGitIgnore(): String = """
