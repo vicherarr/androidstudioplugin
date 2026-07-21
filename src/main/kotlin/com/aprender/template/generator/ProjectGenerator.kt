@@ -92,6 +92,12 @@ object ProjectGenerator {
         writeFile(File(codeDir, "ui/theme/Theme.kt"), FileTemplates.getThemeKt(packageName))
         writeFile(File(codeDir, "ui/theme/Type.kt"), FileTemplates.getTypeKt(packageName))
 
+        // El scaffold de Android Studio deja tests de ejemplo que esta plantilla no usa:
+        // ExampleInstrumentedTest ni siquiera compila, porque aquí no se declaran
+        // dependencias de tests instrumentados (la suite es de tests unitarios en JVM).
+        File(appDir, "src/androidTest").deleteRecursively()
+        File(appDir, "src/test/java/$packagePath/ExampleUnitTest.kt").delete()
+
         // app/src/test/java/<packagePath> — tests unitarios en la JVM
         val testDir = File(appDir, "src/test/java/$packagePath")
         writeFile(File(testDir, "testutil/MainDispatcherRule.kt"), FileTemplates.getMainDispatcherRuleKt(packageName))

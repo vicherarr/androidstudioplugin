@@ -79,9 +79,9 @@ JAVA_HOME=~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr ./gradlew bui
 ```
 
 El archivo generado estará disponible en:
-`build/distributions/AndroidStudioTemplate-1.0.1.zip`
+`build/distributions/AndroidStudioTemplate-1.0.2.zip`
 
-> 📦 En `dist/AndroidStudioTemplate-1.0.1.zip` hay una copia ya compilada, lista para
+> 📦 En `dist/AndroidStudioTemplate-1.0.2.zip` hay una copia ya compilada, lista para
 > descargar desde GitHub. Está construida contra Android Studio Quail 2026.1.1
 > (`AI-261.*`): si usas otra versión mayor del IDE, compila el plugin tú mismo con el
 > comando de arriba.
@@ -90,7 +90,7 @@ El archivo generado estará disponible en:
 1. Abre **Android Studio**.
 2. Ve a **Settings** -> **Plugins**.
 3. Haz clic en el icono del engranaje ⚙️ (esquina superior derecha) y selecciona **Install Plugin from Disk...**.
-4. Selecciona el archivo Zip (`dist/AndroidStudioTemplate-1.0.1.zip`, o el que hayas
+4. Selecciona el archivo Zip (`dist/AndroidStudioTemplate-1.0.2.zip`, o el que hayas
    compilado en `build/distributions/`).
 5. Reinicia Android Studio.
 
