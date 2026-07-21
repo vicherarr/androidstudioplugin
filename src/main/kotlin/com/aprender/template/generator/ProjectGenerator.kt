@@ -72,11 +72,19 @@ object ProjectGenerator {
         writeFile(File(codeDir, "domain/model/Item.kt"), FileTemplates.getItemKt(packageName))
         writeFile(File(codeDir, "domain/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemsUseCase.kt"), FileTemplates.getGetItemsUseCaseKt(packageName))
+        writeFile(File(codeDir, "domain/usecase/GetItemUseCase.kt"), FileTemplates.getGetItemUseCaseKt(packageName))
 
         // UI layer
+        writeFile(File(codeDir, "ui/navigation/AppDestinations.kt"), FileTemplates.getAppDestinationsKt(packageName))
+        writeFile(File(codeDir, "ui/navigation/AppNavHost.kt"), FileTemplates.getAppNavHostKt(packageName))
+
         writeFile(File(codeDir, "ui/main/MainScreen.kt"), FileTemplates.getMainScreenKt(packageName, appName))
         writeFile(File(codeDir, "ui/main/MainUiState.kt"), FileTemplates.getMainUiStateKt(packageName))
         writeFile(File(codeDir, "ui/main/MainViewModel.kt"), FileTemplates.getMainViewModelKt(packageName))
+
+        writeFile(File(codeDir, "ui/detail/DetailScreen.kt"), FileTemplates.getDetailScreenKt(packageName))
+        writeFile(File(codeDir, "ui/detail/DetailUiState.kt"), FileTemplates.getDetailUiStateKt(packageName))
+        writeFile(File(codeDir, "ui/detail/DetailViewModel.kt"), FileTemplates.getDetailViewModelKt(packageName))
 
         writeFile(File(codeDir, "ui/theme/Color.kt"), FileTemplates.getColorKt(packageName))
         writeFile(File(codeDir, "ui/theme/Theme.kt"), FileTemplates.getThemeKt(packageName))

@@ -27,13 +27,23 @@ Cuando se crea un proyecto usando este plugin, se genera una arquitectura limpia
    - Entidad `@Entity`, DAO `@Dao` con `Flow`, e interfaz `@Database`.
 
 4. **Interfaz de usuario reactiva con Jetpack Compose & Material3**
-   - Compose BoM `2025.02.00` con `collectAsStateWithLifecycle()`.
+   - Compose BoM `2025.06.00` con `collectAsStateWithLifecycle()`.
    - `ViewModel` con `@HiltViewModel`.
    - `UiState` inmutable (Loading, Success, Error).
    - Tema Material3 personalizable (`Theme.kt`, `Color.kt`, `Type.kt`).
 
-5. **Catálogo de versiones (`gradle/libs.versions.toml`)**
+5. **Navegación type-safe con Navigation Compose 2.9.1**
+   - Rutas como clases `@Serializable` (`ui/navigation/AppDestinations.kt`), sin strings.
+   - Grafo centralizado en `AppNavHost`; las pantallas reciben lambdas, nunca el `NavController`.
+   - Ejemplo lista → detalle, con los argumentos leídos en el ViewModel vía
+     `savedStateHandle.toRoute<ItemDetailRoute>()`.
+
+6. **Catálogo de versiones (`gradle/libs.versions.toml`)**
    - Todas las versiones alineadas según las guías del proyecto `AprenderDesarrolloAndroid`.
+
+7. **Parámetros del asistente**
+   - Nombre del fichero de base de datos Room y URL base de Retrofit configurables al
+     crear el proyecto.
 
 ---
 
@@ -57,11 +67,17 @@ JAVA_HOME=~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr ./gradlew bui
 El archivo generado estará disponible en:
 `build/distributions/AndroidStudioTemplate-1.0.0.zip`
 
+> 📦 En `dist/AndroidStudioTemplate-1.0.0.zip` hay una copia ya compilada, lista para
+> descargar desde GitHub. Está construida contra Android Studio Quail 2026.1.1
+> (`AI-261.*`): si usas otra versión mayor del IDE, compila el plugin tú mismo con el
+> comando de arriba.
+
 ### 2. Instalar en Android Studio
 1. Abre **Android Studio**.
 2. Ve a **Settings** -> **Plugins**.
 3. Haz clic en el icono del engranaje ⚙️ (esquina superior derecha) y selecciona **Install Plugin from Disk...**.
-4. Selecciona el archivo Zip generado (`build/distributions/AndroidStudioTemplate-1.0.0.zip`).
+4. Selecciona el archivo Zip (`dist/AndroidStudioTemplate-1.0.0.zip`, o el que hayas
+   compilado en `build/distributions/`).
 5. Reinicia Android Studio.
 
 ### 3. Crear un nuevo proyecto

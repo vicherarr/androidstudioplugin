@@ -55,11 +55,13 @@ object FileTemplates {
         activityCompose = "1.10.1"
         composeBom = "2025.06.00"
         hiltNavigationCompose = "1.2.0"
+        navigationCompose = "2.9.1"
 
         [libraries]
         androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
         androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
         androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
+        androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
         androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
         androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
         androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
@@ -71,6 +73,8 @@ object FileTemplates {
         hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
         hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
         hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
+        androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
         retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
         retrofit-converter-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
@@ -145,6 +149,7 @@ object FileTemplates {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.lifecycle.runtime.ktx)
             implementation(libs.androidx.lifecycle.viewmodel.compose)
+            implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.activity.compose)
             implementation(platform(libs.androidx.compose.bom))
             implementation(libs.androidx.compose.ui)
@@ -157,6 +162,9 @@ object FileTemplates {
             implementation(libs.hilt.android)
             ksp(libs.hilt.compiler)
             implementation(libs.hilt.navigation.compose)
+
+            // Navigation (type-safe con kotlinx.serialization)
+            implementation(libs.androidx.navigation.compose)
 
             // Retrofit & Serialization
             implementation(libs.retrofit)
@@ -219,7 +227,7 @@ object FileTemplates {
         import androidx.compose.material3.MaterialTheme
         import androidx.compose.material3.Surface
         import androidx.compose.ui.Modifier
-        import $packageName.ui.main.MainScreen
+        import $packageName.ui.navigation.AppNavHost
         import $packageName.ui.theme.AppTheme
         import dagger.hilt.android.AndroidEntryPoint
 
@@ -234,7 +242,7 @@ object FileTemplates {
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background
                         ) {
-                            MainScreen()
+                            AppNavHost()
                         }
                     }
                 }
@@ -271,6 +279,9 @@ object FileTemplates {
         interface ItemDao {
             @Query("SELECT * FROM items ORDER BY createdAt DESC")
             fun getItems(): Flow<List<ItemEntity>>
+
+            @Query("SELECT * FROM items WHERE id = :id")
+            fun getItemById(id: Int): Flow<ItemEntity?>
 
             @Insert(onConflict = OnConflictStrategy.REPLACE)
             suspend fun insertItems(items: List<ItemEntity>)
@@ -338,6 +349,7 @@ object FileTemplates {
 
         interface ItemRepository {
             fun getItems(): Flow<List<Item>>
+            fun getItem(id: Int): Flow<Item?>
             suspend fun refreshItems(): Result<Unit>
         }
     """.trimIndent()
@@ -361,8 +373,12 @@ object FileTemplates {
 
             override fun getItems(): Flow<List<Item>> {
                 return itemDao.getItems().map { entities ->
-                    entities.map { Item(id = it.id, title = it.title, description = it.description) }
+                    entities.map { it.toDomain() }
                 }
+            }
+
+            override fun getItem(id: Int): Flow<Item?> {
+                return itemDao.getItemById(id).map { entity -> entity?.toDomain() }
             }
 
             override suspend fun refreshItems(): Result<Unit> {
@@ -377,6 +393,9 @@ object FileTemplates {
                     Result.failure(e)
                 }
             }
+
+            private fun ItemEntity.toDomain(): Item =
+                Item(id = id, title = title, description = description)
         }
     """.trimIndent()
 
@@ -522,6 +541,223 @@ object FileTemplates {
         }
     """.trimIndent()
 
+    fun getGetItemUseCaseKt(packageName: String): String = """
+        package $packageName.domain.usecase
+
+        import $packageName.domain.repository.ItemRepository
+        import $packageName.domain.model.Item
+        import kotlinx.coroutines.flow.Flow
+        import javax.inject.Inject
+
+        class GetItemUseCase @Inject constructor(
+            private val repository: ItemRepository
+        ) {
+            operator fun invoke(id: Int): Flow<Item?> {
+                return repository.getItem(id)
+            }
+        }
+    """.trimIndent()
+
+    // Rutas type-safe: cada destino es una clase @Serializable (object si no lleva
+    // argumentos, data class si los lleva). Sin strings ni claves de argumentos.
+    fun getAppDestinationsKt(packageName: String): String = """
+        package $packageName.ui.navigation
+
+        import kotlinx.serialization.Serializable
+
+        @Serializable
+        data object HomeRoute
+
+        @Serializable
+        data class ItemDetailRoute(val itemId: Int)
+    """.trimIndent()
+
+    fun getAppNavHostKt(packageName: String): String = """
+        package $packageName.ui.navigation
+
+        import androidx.compose.runtime.Composable
+        import androidx.compose.ui.Modifier
+        import androidx.navigation.NavHostController
+        import androidx.navigation.compose.NavHost
+        import androidx.navigation.compose.composable
+        import androidx.navigation.compose.rememberNavController
+        import $packageName.ui.detail.DetailScreen
+        import $packageName.ui.main.MainScreen
+
+        @Composable
+        fun AppNavHost(
+            modifier: Modifier = Modifier,
+            navController: NavHostController = rememberNavController()
+        ) {
+            NavHost(
+                navController = navController,
+                startDestination = HomeRoute,
+                modifier = modifier
+            ) {
+                composable<HomeRoute> {
+                    MainScreen(
+                        onItemClick = { itemId ->
+                            navController.navigate(ItemDetailRoute(itemId = itemId))
+                        }
+                    )
+                }
+
+                composable<ItemDetailRoute> {
+                    // Los argumentos se leen en el ViewModel con SavedStateHandle.toRoute(),
+                    // así la pantalla no depende del backStackEntry ni del NavController.
+                    DetailScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
+        }
+    """.trimIndent()
+
+    fun getDetailUiStateKt(packageName: String): String = """
+        package $packageName.ui.detail
+
+        import $packageName.domain.model.Item
+
+        sealed interface DetailUiState {
+            data object Loading : DetailUiState
+            data object NotFound : DetailUiState
+            data class Success(val item: Item) : DetailUiState
+            data class Error(val message: String) : DetailUiState
+        }
+    """.trimIndent()
+
+    fun getDetailViewModelKt(packageName: String): String = """
+        package $packageName.ui.detail
+
+        import androidx.lifecycle.SavedStateHandle
+        import androidx.lifecycle.ViewModel
+        import androidx.lifecycle.viewModelScope
+        import androidx.navigation.toRoute
+        import $packageName.domain.usecase.GetItemUseCase
+        import $packageName.ui.navigation.ItemDetailRoute
+        import dagger.hilt.android.lifecycle.HiltViewModel
+        import kotlinx.coroutines.flow.SharingStarted
+        import kotlinx.coroutines.flow.StateFlow
+        import kotlinx.coroutines.flow.catch
+        import kotlinx.coroutines.flow.map
+        import kotlinx.coroutines.flow.stateIn
+        import javax.inject.Inject
+
+        @HiltViewModel
+        class DetailViewModel @Inject constructor(
+            savedStateHandle: SavedStateHandle,
+            getItemUseCase: GetItemUseCase
+        ) : ViewModel() {
+
+            // Argumentos de navegación con tipado estricto, sin claves ni casts
+            private val route: ItemDetailRoute = savedStateHandle.toRoute()
+
+            val uiState: StateFlow<DetailUiState> = getItemUseCase(route.itemId)
+                .map { item ->
+                    if (item == null) DetailUiState.NotFound else DetailUiState.Success(item)
+                }
+                .catch { emit(DetailUiState.Error(it.message ?: "Unknown error")) }
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = DetailUiState.Loading
+                )
+        }
+    """.trimIndent()
+
+    fun getDetailScreenKt(packageName: String): String = """
+        package $packageName.ui.detail
+
+        import androidx.compose.foundation.layout.Box
+        import androidx.compose.foundation.layout.Column
+        import androidx.compose.foundation.layout.Spacer
+        import androidx.compose.foundation.layout.fillMaxSize
+        import androidx.compose.foundation.layout.height
+        import androidx.compose.foundation.layout.padding
+        import androidx.compose.material.icons.Icons
+        import androidx.compose.material.icons.automirrored.filled.ArrowBack
+        import androidx.compose.material3.CircularProgressIndicator
+        import androidx.compose.material3.ExperimentalMaterial3Api
+        import androidx.compose.material3.Icon
+        import androidx.compose.material3.IconButton
+        import androidx.compose.material3.MaterialTheme
+        import androidx.compose.material3.Scaffold
+        import androidx.compose.material3.Text
+        import androidx.compose.material3.TopAppBar
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.ui.Alignment
+        import androidx.compose.ui.Modifier
+        import androidx.compose.ui.unit.dp
+        import androidx.hilt.navigation.compose.hiltViewModel
+        import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun DetailScreen(
+            onNavigateBack: () -> Unit,
+            viewModel: DetailViewModel = hiltViewModel()
+        ) {
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text("Detail") },
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                        }
+                    )
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    when (val state = uiState) {
+                        is DetailUiState.Loading -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        is DetailUiState.NotFound -> {
+                            Text(
+                                text = "Item not found.",
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        is DetailUiState.Error -> {
+                            Text(
+                                text = "Error: ${'$'}{state.message}",
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        is DetailUiState.Success -> {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = state.item.title,
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = state.item.description,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    """.trimIndent()
+
     fun getMainUiStateKt(packageName: String): String = """
         package $packageName.ui.main
 
@@ -589,6 +825,7 @@ object FileTemplates {
     fun getMainScreenKt(packageName: String, appName: String): String = """
         package $packageName.ui.main
 
+        import androidx.compose.foundation.clickable
         import androidx.compose.foundation.layout.Box
         import androidx.compose.foundation.layout.Column
         import androidx.compose.foundation.layout.Spacer
@@ -617,6 +854,7 @@ object FileTemplates {
         @OptIn(ExperimentalMaterial3Api::class)
         @Composable
         fun MainScreen(
+            onItemClick: (Int) -> Unit,
             viewModel: MainViewModel = hiltViewModel()
         ) {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -667,6 +905,7 @@ object FileTemplates {
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                .clickable { onItemClick(item.id) }
                                         ) {
                                             Column(modifier = Modifier.padding(16.dp)) {
                                                 Text(
@@ -834,6 +1073,7 @@ object FileTemplates {
         ## Architecture
         This project follows the official Google Android Architecture recommendations:
         - **UI Layer**: Jetpack Compose, Material3, ViewModels, `UiState` flow.
+        - **Navigation**: Navigation Compose type-safe (`@Serializable` routes).
         - **Domain Layer**: UseCases encapsulating business logic.
         - **Data Layer**:
           - **Local**: Room Database, DAOs, Entities with KSP.
@@ -847,6 +1087,21 @@ object FileTemplates {
         - `di/`: Hilt modules (`DatabaseModule`, `NetworkModule`, `RepositoryModule`)
         - `domain/`: Business models, Repository interfaces, and UseCases
         - `ui/`: Compose Screens, ViewModels, UiState, Theme
+        - `ui/navigation/`: `AppDestinations` (rutas `@Serializable`) and `AppNavHost` (nav graph)
+
+        ## Navigation (type-safe)
+        Routes are Kotlin types, not strings — the compiler checks every destination and argument.
+
+        1. Declare the destination in `ui/navigation/AppDestinations.kt`:
+           `@Serializable data class ItemDetailRoute(val itemId: Int)`
+        2. Register it in `ui/navigation/AppNavHost.kt`:
+           `composable<ItemDetailRoute> { DetailScreen(onNavigateBack = { navController.popBackStack() }) }`
+        3. Navigate with an instance: `navController.navigate(ItemDetailRoute(itemId = 42))`
+        4. Read the arguments in the ViewModel: `savedStateHandle.toRoute<ItemDetailRoute>()`
+
+        Screens never receive the `NavController`: they expose lambdas (`onItemClick`,
+        `onNavigateBack`) and the `NavHost` decides where each event leads. This keeps the
+        screens previewable, testable, and reusable.
 
     """.trimIndent()
 }
