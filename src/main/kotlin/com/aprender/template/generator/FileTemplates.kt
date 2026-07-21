@@ -3,6 +3,10 @@ package com.aprender.template.generator
 object FileTemplates {
 
     fun getRootBuildGradleKts(): String = """
+        // Fichero de build RAÍZ del proyecto.
+        // Aquí solo se DECLARAN los plugins que estarán disponibles para los módulos.
+        // "apply false" significa: descárgalo, pero no lo actives en este fichero; cada
+        // módulo (aquí solo :app) decide cuáles usa de verdad.
         plugins {
             alias(libs.plugins.android.application) apply false
             alias(libs.plugins.kotlin.android) apply false
@@ -15,6 +19,10 @@ object FileTemplates {
     """.trimIndent()
 
     fun getSettingsGradleKts(appName: String): String = """
+        // Fichero que define QUÉ MÓDULOS forman el proyecto y DE DÓNDE se descargan
+        // las librerías. Gradle lo lee antes que cualquier build.gradle.kts.
+
+        // Repositorios para buscar los PLUGINS de Gradle
         pluginManagement {
             repositories {
                 google {
@@ -28,19 +36,31 @@ object FileTemplates {
                 gradlePluginPortal()
             }
         }
+        // Repositorios para buscar las LIBRERÍAS (dependencias)
         dependencyResolutionManagement {
+            // Obliga a declarar los repositorios aquí y no en cada módulo: así todos
+            // los módulos descargan de los mismos sitios
             repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
-                google()
-                mavenCentral()
+                google()        // librerías de Android y Google
+                mavenCentral()  // el resto (Retrofit, OkHttp, Turbine...)
             }
         }
 
         rootProject.name = "$appName"
-        include(":app")
+        include(":app")   // el proyecto tiene un único módulo, llamado "app"
     """.trimIndent()
 
     fun getLibsVersionsToml(): String = """
+        # CATÁLOGO DE VERSIONES (version catalog).
+        # Es la lista central de librerías del proyecto. En vez de escribir la versión
+        # en cada build.gradle.kts, se define aquí una vez y se referencia con
+        # libs.nombre.de.la.libreria. Actualizar una versión = tocar una sola línea.
+        #
+        # [versions]  -> los números de versión
+        # [libraries] -> las librerías, que apuntan a una versión con version.ref
+        # [plugins]   -> los plugins de Gradle
+
         [versions]
         agp = "8.11.1"
         kotlin = "2.1.21"
@@ -106,26 +126,32 @@ object FileTemplates {
     fun getAppBuildGradleKts(packageName: String): String = """
         import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+        // Build del módulo :app — aquí se activan los plugins y se declaran las librerías
         plugins {
-            alias(libs.plugins.android.application)
-            alias(libs.plugins.kotlin.android)
-            alias(libs.plugins.kotlin.compose)
-            alias(libs.plugins.kotlin.serialization)
-            alias(libs.plugins.ksp)
-            alias(libs.plugins.hilt.android)
-            alias(libs.plugins.room)
+            alias(libs.plugins.android.application)   // convierte el módulo en una app Android
+            alias(libs.plugins.kotlin.android)        // permite escribir Kotlin
+            alias(libs.plugins.kotlin.compose)        // compilador de Jetpack Compose
+            alias(libs.plugins.kotlin.serialization)  // convierte clases <-> JSON (y rutas type-safe)
+            alias(libs.plugins.ksp)                   // genera código en compilación (Hilt y Room lo usan)
+            alias(libs.plugins.hilt.android)          // inyección de dependencias
+            alias(libs.plugins.room)                  // soporte de base de datos Room
         }
 
         android {
+            // namespace: el paquete base del código (el de los import y el de R)
             namespace = "$packageName"
+            // compileSdk: versión de Android con la que se COMPILA (usa las APIs más nuevas)
             compileSdk = 36
 
             defaultConfig {
+                // applicationId: identificador único de la app en el dispositivo y en Google Play
                 applicationId = "$packageName"
+                // minSdk: versión MÍNIMA de Android donde se puede instalar (26 = Android 8)
                 minSdk = 26
+                // targetSdk: versión para la que está probada; afecta a permisos y comportamiento
                 targetSdk = 36
-                versionCode = 1
-                versionName = "1.0"
+                versionCode = 1     // número interno que sube en cada publicación
+                versionName = "1.0" // versión visible para el usuario
             }
 
             buildTypes {
@@ -140,16 +166,18 @@ object FileTemplates {
                     )
                 }
             }
+            // Versión de Java que entiende el código compilado
             compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
             buildFeatures {
-                compose = true
-                buildConfig = true
+                compose = true      // activa Jetpack Compose
+                buildConfig = true  // genera la clase BuildConfig (se usa para saber si es debug)
             }
         }
 
+        // Misma versión de Java para el compilador de Kotlin
         kotlin {
             compilerOptions {
                 jvmTarget.set(JvmTarget.JVM_17)
@@ -157,9 +185,16 @@ object FileTemplates {
         }
 
         room {
+            // Room exporta el esquema de la BD a JSON en la carpeta schemas/.
+            // Sirve para escribir migraciones cuando cambie la base de datos.
             schemaDirectory("${'$'}projectDir/schemas")
         }
 
+        // Librerías del módulo. Vienen del catálogo gradle/libs.versions.toml
+        //   implementation      -> disponible en la app
+        //   ksp                 -> generador de código (no acaba dentro de la app)
+        //   debugImplementation -> solo en las builds de depuración
+        //   testImplementation  -> solo al ejecutar los tests
         dependencies {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -223,8 +258,13 @@ object FileTemplates {
 
     fun getAndroidManifestXml(packageName: String): String = """
         <?xml version="1.0" encoding="utf-8"?>
+        <!--
+            El MANIFEST es la ficha de identidad de la app para el sistema Android:
+            qué permisos necesita, qué pantallas tiene y cuál se abre al pulsar el icono.
+        -->
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+            <!-- Sin este permiso, cualquier llamada de red falla -->
             <uses-permission android:name="android.permission.INTERNET" />
 
             <application
@@ -239,6 +279,10 @@ object FileTemplates {
                     android:name=".MainActivity"
                     android:exported="true"
                     android:theme="@style/Theme.App">
+                    <!--
+                        Este intent-filter marca la pantalla de ENTRADA: MAIN dice que es
+                        el punto de arranque y LAUNCHER que aparezca en el menú de apps.
+                    -->
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
                         <category android:name="android.intent.category.LAUNCHER" />
@@ -255,6 +299,14 @@ object FileTemplates {
         import android.app.Application
         import dagger.hilt.android.HiltAndroidApp
 
+        /**
+         * Clase Application: es lo PRIMERO que se crea al abrir la app y vive mientras
+         * la app viva.
+         *
+         * @HiltAndroidApp le dice a Hilt que genere aquí el "contenedor" de dependencias
+         * de toda la app. Sin esta anotación, ningún @Inject funcionaría.
+         * Está registrada en el AndroidManifest.xml con android:name=".MainApplication".
+         */
         @HiltAndroidApp
         class MainApplication : Application()
     """.trimIndent()
@@ -274,17 +326,30 @@ object FileTemplates {
         import $packageName.ui.theme.AppTheme
         import dagger.hilt.android.AndroidEntryPoint
 
+        /**
+         * Única Activity de la app: hace de contenedor y no contiene lógica.
+         * Todas las "pantallas" son composables dentro del grafo de navegación.
+         *
+         * @AndroidEntryPoint permite que Hilt inyecte dependencias aquí dentro
+         * (por ejemplo, los ViewModel que piden las pantallas).
+         */
         @AndroidEntryPoint
         class MainActivity : ComponentActivity() {
+
+            // onCreate se ejecuta al crear la pantalla (y al girar el móvil, por ejemplo)
             override fun onCreate(savedInstanceState: Bundle?) {
                 super.onCreate(savedInstanceState)
+                // Dibuja debajo de la barra de estado y la de navegación
                 enableEdgeToEdge()
+                // setContent: a partir de aquí la interfaz se describe con Compose
                 setContent {
+                    // AppTheme aplica colores, tipografías y modo oscuro a todo lo de dentro
                     AppTheme {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background
                         ) {
+                            // El grafo de navegación decide qué pantalla se ve
                             AppNavHost()
                         }
                     }
@@ -299,9 +364,16 @@ object FileTemplates {
         import androidx.room.Entity
         import androidx.room.PrimaryKey
 
+        /**
+         * ENTITY = una fila de la base de datos, representada como clase de Kotlin.
+         * Room crea la tabla "items" a partir de esta clase: cada propiedad es una columna.
+         *
+         * Ojo: esta clase pertenece a la capa de DATOS. La pantalla nunca la usa
+         * directamente; para eso está el modelo de dominio (domain/model/Item.kt).
+         */
         @Entity(tableName = "items")
         data class ItemEntity(
-            @PrimaryKey val id: Int,
+            @PrimaryKey val id: Int,  // clave primaria: identifica la fila y no se repite
             val title: String,
             val description: String,
             val createdAt: Long = System.currentTimeMillis()
@@ -318,14 +390,27 @@ object FileTemplates {
         import $packageName.data.local.entity.ItemEntity
         import kotlinx.coroutines.flow.Flow
 
+        /**
+         * DAO (Data Access Object) = las operaciones permitidas sobre la tabla.
+         * Solo se declara QUÉ se quiere hacer; Room genera el código que lo hace.
+         *
+         * Dos formas de devolver datos:
+         *  - Flow<T>: consulta OBSERVABLE. Room reemite solo cuando la tabla cambia,
+         *    así la pantalla se actualiza sola. No necesita suspend.
+         *  - suspend fun: operación puntual que tarda (insertar, borrar) y por eso
+         *    debe ejecutarse en una corrutina, nunca bloqueando la pantalla.
+         */
         @Dao
         interface ItemDao {
+
             @Query("SELECT * FROM items ORDER BY createdAt DESC")
             fun getItems(): Flow<List<ItemEntity>>
 
+            // :id en el SQL se sustituye por el parámetro id de la función
             @Query("SELECT * FROM items WHERE id = :id")
-            fun getItemById(id: Int): Flow<ItemEntity?>
+            fun getItemById(id: Int): Flow<ItemEntity?>   // null si no existe esa fila
 
+            // REPLACE: si ya existe una fila con esa clave primaria, la sobreescribe
             @Insert(onConflict = OnConflictStrategy.REPLACE)
             suspend fun insertItems(items: List<ItemEntity>)
 
@@ -342,6 +427,15 @@ object FileTemplates {
         import $packageName.data.local.dao.ItemDao
         import $packageName.data.local.entity.ItemEntity
 
+        /**
+         * La base de datos: une las tablas (entities) con sus DAOs.
+         *
+         * version = 1 -> si algún día cambias una tabla, hay que subir este número y
+         * escribir una MIGRACIÓN, o la app fallará al abrir bases de datos antiguas.
+         * exportSchema = true -> guarda el esquema en schemas/ para poder migrar.
+         *
+         * Es abstract porque Room genera la implementación real al compilar.
+         */
         @Database(entities = [ItemEntity::class], version = 1, exportSchema = true)
         abstract class AppDatabase : RoomDatabase() {
             abstract fun itemDao(): ItemDao
@@ -354,6 +448,15 @@ object FileTemplates {
         import kotlinx.serialization.SerialName
         import kotlinx.serialization.Serializable
 
+        /**
+         * DTO (Data Transfer Object) = cómo viene el JSON del servidor, tal cual.
+         *
+         * @Serializable permite convertir el JSON en esta clase automáticamente.
+         * @SerialName conecta el nombre del campo en el JSON con el nombre en Kotlin:
+         * el servidor manda "body", pero en el código se llama description, que se
+         * entiende mejor. Separar DTO de Entity evita que un cambio en la API te
+         * obligue a tocar la base de datos.
+         */
         @Serializable
         data class ItemDto(
             @SerialName("id") val id: Int,
@@ -368,6 +471,13 @@ object FileTemplates {
         import $packageName.data.remote.dto.ItemDto
         import retrofit2.http.GET
 
+        /**
+         * Definición de la API REST. Solo se describe la llamada; Retrofit escribe el
+         * código que abre la conexión, lee la respuesta y la convierte a objetos.
+         *
+         * @GET("posts") se pega detrás de la BASE_URL del NetworkModule.
+         * suspend: la llamada tarda, así que solo puede hacerse desde una corrutina.
+         */
         interface ApiService {
             @GET("posts")
             suspend fun getItems(): List<ItemDto>
@@ -377,6 +487,12 @@ object FileTemplates {
     fun getItemKt(packageName: String): String = """
         package $packageName.domain.model
 
+        /**
+         * MODELO DE DOMINIO: el item tal y como lo entiende la app, sin saber nada de
+         * dónde viene (ni Room, ni Retrofit, ni JSON).
+         *
+         * Por eso no tiene anotaciones: es Kotlin puro. Es lo que viaja hacia la UI.
+         */
         data class Item(
             val id: Int,
             val title: String,
@@ -390,9 +506,25 @@ object FileTemplates {
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
 
+        /**
+         * CONTRATO del repositorio: qué se puede pedir sobre los items, sin decir cómo
+         * se consigue. La implementación real está en data/repository/.
+         *
+         * ¿Por qué una interfaz? Porque quien la usa (los casos de uso) no depende de
+         * Room ni de Retrofit, y en los tests se puede sustituir por una versión falsa.
+         */
         interface ItemRepository {
+
+            /** Lista observable: emite de nuevo cada vez que cambian los datos guardados. */
             fun getItems(): Flow<List<Item>>
+
+            /** Un item concreto; emite null si no existe. */
             fun getItem(id: Int): Flow<Item?>
+
+            /**
+             * Pide datos nuevos a la red y los guarda.
+             * Devuelve Result para poder informar del fallo sin lanzar excepciones.
+             */
             suspend fun refreshItems(): Result<Unit>
         }
     """.trimIndent()
@@ -417,19 +549,33 @@ object FileTemplates {
         import javax.inject.Singleton
 
         /**
-         * Única fuente de verdad de los items: la base de datos manda y la red solo
-         * la refresca (offline-first).
+         * Implementación del repositorio (patrón OFFLINE-FIRST).
+         *
+         * La regla: la pantalla SIEMPRE lee de la base de datos, nunca de la red.
+         * La red solo sirve para actualizar la base de datos. Ventajas: la app funciona
+         * sin conexión y hay una única fuente de verdad, así que no puede haber dos
+         * versiones distintas del mismo dato.
+         *
+         *   Red  --refreshItems()-->  Room  --getItems()-->  UI
+         *
+         * @Inject constructor: Hilt sabe crear esta clase y le pasa solo lo que pide.
+         * @Singleton: existe una única instancia en toda la app.
          */
         @Singleton
         class DefaultItemRepository @Inject constructor(
             private val apiService: ApiService,
             private val itemDao: ItemDao,
+            // El dispatcher se inyecta en vez de escribir Dispatchers.IO a pelo: así en
+            // los tests se puede sustituir por uno de prueba
             @IoDispatcher private val ioDispatcher: CoroutineDispatcher
         ) : ItemRepository {
 
             override fun getItems(): Flow<List<Item>> {
                 return itemDao.getItems()
+                    // map transforma cada emisión: de entidades de BD a modelos de dominio
                     .map { entities -> entities.map { it.toDomain() } }
+                    // flowOn mueve el trabajo de ARRIBA a un hilo secundario, para no
+                    // congelar la pantalla
                     .flowOn(ioDispatcher)
             }
 
@@ -441,18 +587,25 @@ object FileTemplates {
 
             override suspend fun refreshItems(): Result<Unit> = withContext(ioDispatcher) {
                 try {
+                    // 1. Pedir los datos a la API
                     val remoteItems = apiService.getItems()
+                    // 2. Guardarlos en la base de datos. No hace falta avisar a la
+                    //    pantalla: el Flow del DAO reemite solo y la UI se actualiza
                     itemDao.insertItems(remoteItems.map { it.toEntity() })
                     Result.success(Unit)
                 } catch (e: CancellationException) {
-                    // La cancelación no es un error: debe propagarse para que la
-                    // concurrencia estructurada funcione
+                    // OJO: si el usuario sale de la pantalla, la corrutina se cancela
+                    // lanzando esta excepción. NO es un error, hay que dejarla pasar o
+                    // se rompe la cancelación de corrutinas.
                     throw e
                 } catch (e: Exception) {
+                    // Sin internet, servidor caído, JSON inesperado... el fallo se
+                    // devuelve envuelto en Result en vez de tirar la app abajo
                     Result.failure(e)
                 }
             }
 
+            // MAPPERS: traducen entre las capas. Son privados porque solo importan aquí.
             private fun ItemEntity.toDomain(): Item =
                 Item(id = id, title = title, description = description)
 
@@ -474,10 +627,22 @@ object FileTemplates {
         import kotlinx.coroutines.Dispatchers
         import javax.inject.Qualifier
 
+        /**
+         * QUALIFIER: una etiqueta para distinguir objetos del mismo tipo.
+         * Hay varios CoroutineDispatcher posibles (IO, Default, Main); esta anotación
+         * indica cuál se quiere pedir.
+         */
         @Qualifier
         @Retention(AnnotationRetention.RUNTIME)
         annotation class IoDispatcher
 
+        /**
+         * Provee el dispatcher de entrada/salida (red y disco).
+         *
+         * ¿Por qué no escribir Dispatchers.IO directamente donde haga falta? Porque
+         * entonces el código quedaría atado al hilo real y los tests serían lentos e
+         * impredecibles. Inyectándolo, un test puede pasar un dispatcher de prueba.
+         */
         @Module
         @InstallIn(SingletonComponent::class)
         object DispatcherModule {
@@ -502,20 +667,34 @@ object FileTemplates {
         import dagger.hilt.components.SingletonComponent
         import javax.inject.Singleton
 
+        /**
+         * MÓDULO DE HILT: receta para construir objetos que no se pueden crear con
+         * @Inject constructor, normalmente porque vienen de una librería.
+         *
+         * @InstallIn(SingletonComponent::class): lo que se cree aquí vive mientras
+         * viva la app.
+         */
         @Module
         @InstallIn(SingletonComponent::class)
         object DatabaseModule {
 
+            /**
+             * @Provides: "cuando alguien pida un AppDatabase, constrúyelo así".
+             * @Singleton: créalo UNA sola vez y reutilízalo. Abrir varias conexiones a
+             * la misma base de datos sería un error caro.
+             */
             @Provides
             @Singleton
             fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
                 return Room.databaseBuilder(
                     context,
                     AppDatabase::class.java,
-                    "$dbName"
+                    "$dbName"   // nombre del fichero de la base de datos en el dispositivo
                 ).build()
             }
 
+            // El DAO se saca de la base de datos ya creada: Hilt inyecta el AppDatabase
+            // de arriba automáticamente al ver el parámetro
             @Provides
             fun provideItemDao(database: AppDatabase): ItemDao {
                 return database.itemDao()
@@ -541,32 +720,49 @@ object FileTemplates {
         import java.util.concurrent.TimeUnit
         import javax.inject.Singleton
 
+        /**
+         * Módulo con todo lo necesario para hablar con la API.
+         * Se construye por piezas, y cada una recibe la anterior:
+         *
+         *   Json + OkHttpClient  ->  Retrofit  ->  ApiService
+         */
         @Module
         @InstallIn(SingletonComponent::class)
         object NetworkModule {
 
+            // Dirección base del servidor; los @GET("...") se pegan detrás
             private const val BASE_URL = "$baseUrl"
 
+            /** Conversor de JSON, configurado para ser tolerante con respuestas raras. */
             @Provides
             @Singleton
             fun provideJson(): Json = Json {
+                // Si el servidor manda campos que la app no conoce, los ignora en vez
+                // de fallar (muy habitual cuando la API evoluciona)
                 ignoreUnknownKeys = true
+                // Si llega null donde se esperaba un valor, usa el valor por defecto
                 coerceInputValues = true
             }
 
+            /** Cliente HTTP: quien de verdad hace las peticiones de red. */
             @Provides
             @Singleton
             fun provideOkHttpClient(): OkHttpClient {
                 return OkHttpClient.Builder()
                     .addInterceptor(HttpLoggingInterceptor().apply {
+                        // En debug se registra el contenido de cada petición para poder
+                        // depurar; en release NO, porque el log podría filtrar datos
+                        // personales o tokens
                         level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
                     })
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(15, TimeUnit.SECONDS)
-                    .writeTimeout(15, TimeUnit.SECONDS)
+                    // Sin timeouts, una red lenta dejaría la petición colgada para siempre
+                    .connectTimeout(15, TimeUnit.SECONDS)  // abrir la conexión
+                    .readTimeout(15, TimeUnit.SECONDS)     // recibir la respuesta
+                    .writeTimeout(15, TimeUnit.SECONDS)    // enviar los datos
                     .build()
             }
 
+            /** Retrofit une el cliente HTTP con el conversor de JSON. */
             @Provides
             @Singleton
             fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
@@ -578,6 +774,7 @@ object FileTemplates {
                     .build()
             }
 
+            /** Implementación de la interfaz ApiService, generada por Retrofit. */
             @Provides
             @Singleton
             fun provideApiService(retrofit: Retrofit): ApiService {
@@ -597,6 +794,14 @@ object FileTemplates {
         import dagger.hilt.components.SingletonComponent
         import javax.inject.Singleton
 
+        /**
+         * Conecta la INTERFAZ con su IMPLEMENTACIÓN: cuando alguien pida un
+         * ItemRepository, Hilt le entregará un DefaultItemRepository.
+         *
+         * Se usa @Binds en vez de @Provides porque la clase ya sabe construirse sola
+         * (tiene @Inject constructor); aquí solo se indica la equivalencia. Por eso el
+         * módulo es abstract y la función no tiene cuerpo: genera menos código.
+         */
         @Module
         @InstallIn(SingletonComponent::class)
         abstract class RepositoryModule {
@@ -617,6 +822,15 @@ object FileTemplates {
         import kotlinx.coroutines.flow.Flow
         import javax.inject.Inject
 
+        /**
+         * CASO DE USO = una acción concreta que la app sabe hacer, con nombre de verbo.
+         * Aquí: "obtener los items".
+         *
+         * Regla: un caso de uso, una sola operación. Al declararla con
+         * "operator fun invoke", se llama como si fuera una función:
+         *
+         *     getItemsUseCase()    en vez de    getItemsUseCase.execute()
+         */
         class GetItemsUseCase @Inject constructor(
             private val repository: ItemRepository
         ) {
@@ -632,6 +846,12 @@ object FileTemplates {
         import $packageName.domain.repository.ItemRepository
         import javax.inject.Inject
 
+        /**
+         * Caso de uso "refrescar los items": pide datos nuevos a la red.
+         *
+         * Es suspend porque tarda. Está separado de GetItemsUseCase a propósito:
+         * obtener y refrescar son dos acciones distintas.
+         */
         class RefreshItemsUseCase @Inject constructor(
             private val repository: ItemRepository
         ) {
@@ -649,6 +869,10 @@ object FileTemplates {
         import kotlinx.coroutines.flow.Flow
         import javax.inject.Inject
 
+        /**
+         * Caso de uso "obtener un item por su id", que usa la pantalla de detalle.
+         * Devuelve un Flow que emite null si ese item no existe.
+         */
         class GetItemUseCase @Inject constructor(
             private val repository: ItemRepository
         ) {
@@ -665,9 +889,21 @@ object FileTemplates {
 
         import kotlinx.serialization.Serializable
 
+        /*
+         * DESTINOS DE NAVEGACIÓN (type-safe).
+         *
+         * Cada pantalla es una clase, no un texto tipo "detalle/{id}". Ventaja: si te
+         * equivocas en el nombre o en el tipo de un argumento, no compila. Con strings,
+         * el error aparecía al pulsar el botón en el móvil.
+         *
+         * @Serializable permite convertir la ruta a datos y recuperarla después.
+         */
+
+        /** Pantalla de inicio. Es un object porque no necesita argumentos. */
         @Serializable
         data object HomeRoute
 
+        /** Pantalla de detalle. Es data class porque viaja con el id del item. */
         @Serializable
         data class ItemDetailRoute(val itemId: Int)
     """.trimIndent()
@@ -684,19 +920,32 @@ object FileTemplates {
         import $packageName.ui.detail.DetailScreen
         import $packageName.ui.main.MainScreen
 
+        /**
+         * GRAFO DE NAVEGACIÓN: el mapa de la app. Dice qué pantallas existen y cómo se
+         * pasa de una a otra.
+         *
+         * Fíjate en que las pantallas reciben LAMBDAS (onItemClick, onNavigateBack) y
+         * nunca el navController. Así una pantalla no sabe a dónde lleva su botón: eso
+         * se decide aquí. Eso las hace previsualizables y reutilizables.
+         */
         @Composable
         fun AppNavHost(
             modifier: Modifier = Modifier,
+            // rememberNavController crea el "mando" de navegación y lo conserva
+            // aunque la pantalla se redibuje
             navController: NavHostController = rememberNavController()
         ) {
             NavHost(
                 navController = navController,
-                startDestination = HomeRoute,
+                startDestination = HomeRoute,   // pantalla que se ve al abrir la app
                 modifier = modifier
             ) {
+                // composable<Ruta> { } asocia una ruta con la pantalla que se dibuja
                 composable<HomeRoute> {
                     MainScreen(
                         onItemClick = { itemId ->
+                            // Navegar = crear la ruta con sus argumentos. El compilador
+                            // exige que el itemId sea un Int, no hay strings de por medio
                             navController.navigate(ItemDetailRoute(itemId = itemId))
                         }
                     )
@@ -706,6 +955,8 @@ object FileTemplates {
                     // Los argumentos se leen en el ViewModel con SavedStateHandle.toRoute(),
                     // así la pantalla no depende del backStackEntry ni del NavController.
                     DetailScreen(
+                        // popBackStack quita la pantalla actual de la pila y vuelve a
+                        // la anterior: es el "atrás" de toda la vida
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -718,8 +969,10 @@ object FileTemplates {
 
         import $packageName.domain.model.Item
 
+        /** Estados posibles de la pantalla de detalle (ver MainUiState para el porqué). */
         sealed interface DetailUiState {
             data object Loading : DetailUiState
+            /** El id de la ruta no corresponde a ningún item guardado. */
             data object NotFound : DetailUiState
             data class Success(val item: Item) : DetailUiState
             data class Error(val message: String) : DetailUiState
@@ -743,17 +996,28 @@ object FileTemplates {
         import kotlinx.coroutines.flow.stateIn
         import javax.inject.Inject
 
+        /**
+         * VIEWMODEL del detalle.
+         *
+         * Lo interesante: no recibe el id por parámetro, lo saca de la navegación.
+         * SavedStateHandle es la "caja" donde Android guarda los argumentos con los que
+         * se abrió la pantalla (y que sobrevive si el sistema mata la app por memoria).
+         */
         @HiltViewModel
         class DetailViewModel @Inject constructor(
             savedStateHandle: SavedStateHandle,
             getItemUseCase: GetItemUseCase
         ) : ViewModel() {
 
-            // Argumentos de navegación con tipado estricto, sin claves ni casts
+            // toRoute() reconstruye la ruta completa con sus argumentos ya tipados.
+            // Nada de savedStateHandle.get<Int>("itemId"): si el nombre o el tipo no
+            // cuadran, falla al compilar en vez de en el móvil del usuario.
             private val route: ItemDetailRoute = savedStateHandle.toRoute()
 
             val uiState: StateFlow<DetailUiState> = getItemUseCase(route.itemId)
                 .map { item ->
+                    // El caso de uso devuelve null cuando no existe; aquí se traduce
+                    // a un estado que la pantalla sabe pintar
                     if (item == null) DetailUiState.NotFound else DetailUiState.Success(item)
                 }
                 .catch { emit(DetailUiState.Error(it.message ?: "Unknown error")) }
@@ -795,7 +1059,12 @@ object FileTemplates {
         import $packageName.domain.model.Item
         import $packageName.ui.theme.AppTheme
 
-        /** Pantalla con estado: conecta el ViewModel con el contenido sin estado. */
+        /**
+         * Pantalla de detalle con estado. Igual que MainScreen: habla con el ViewModel
+         * y delega el dibujo en el composable sin estado de abajo.
+         *
+         * No recibe el itemId: ese dato lo recoge el ViewModel de la navegación.
+         */
         @Composable
         fun DetailScreen(
             onNavigateBack: () -> Unit,
@@ -811,7 +1080,7 @@ object FileTemplates {
             )
         }
 
-        /** Contenido sin estado: previsualizable y testeable en aislamiento. */
+        /** Contenido sin estado del detalle: recibe qué pintar y avisa del "atrás". */
         @OptIn(ExperimentalMaterial3Api::class)
         @Composable
         fun DetailContent(
@@ -827,7 +1096,11 @@ object FileTemplates {
                         navigationIcon = {
                             IconButton(onClick = onNavigateBack) {
                                 Icon(
+                                    // AutoMirrored: la flecha se gira sola en idiomas
+                                    // que se leen de derecha a izquierda (árabe, hebreo)
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    // contentDescription lo lee el lector de pantalla
+                                    // para personas ciegas: nunca lo dejes vacío
                                     contentDescription = "Back"
                                 )
                             }
@@ -904,9 +1177,21 @@ object FileTemplates {
 
         import $packageName.domain.model.Item
 
+        /**
+         * ESTADO DE LA PANTALLA: todo lo que la lista necesita para dibujarse.
+         *
+         * Es una "sealed interface": la pantalla solo puede estar en UNO de estos
+         * estados, y el compilador obliga a tratarlos todos en el when. Así es
+         * imposible olvidarse de pintar el error o el cargando.
+         */
         sealed interface MainUiState {
+            /** Aún no hay datos: se muestra el círculo de progreso. */
             data object Loading : MainUiState
+
+            /** Hay datos (la lista puede estar vacía, y eso también se pinta). */
             data class Success(val items: List<Item>) : MainUiState
+
+            /** No se pudo cargar nada: se muestra el mensaje y el botón de reintentar. */
             data class Error(val message: String) : MainUiState
         }
     """.trimIndent()
@@ -931,46 +1216,76 @@ object FileTemplates {
         import kotlinx.coroutines.launch
         import javax.inject.Inject
 
+        /**
+         * VIEWMODEL de la lista.
+         *
+         * Su trabajo: preparar el estado que la pantalla pinta y recibir los eventos
+         * del usuario. NO sabe nada de Compose, ni de Room, ni de Retrofit.
+         *
+         * Sobrevive a los giros de pantalla, así que los datos no se recargan al rotar.
+         * @HiltViewModel permite que Hilt le inyecte los casos de uso.
+         */
         @HiltViewModel
         class MainViewModel @Inject constructor(
             getItemsUseCase: GetItemsUseCase,
             private val refreshItemsUseCase: RefreshItemsUseCase
         ) : ViewModel() {
 
+            // Mensaje de error de la última carga; null significa "sin error"
             private val loadError = MutableStateFlow<String?>(null)
 
+            /**
+             * El estado de la pantalla, en un único flujo observable.
+             *
+             * combine: mezcla dos flujos (los items y el error) y produce uno nuevo
+             * cada vez que cualquiera de los dos cambia.
+             */
             val uiState: StateFlow<MainUiState> =
                 combine(getItemsUseCase(), loadError) { items, error ->
+                    // Solo se muestra la pantalla de error si NO hay nada que enseñar
                     if (items.isEmpty() && error != null) {
                         MainUiState.Error(error)
                     } else {
                         MainUiState.Success(items)
                     }
                 }
+                    // catch: si el flujo de datos revienta, la app no cae; se pinta el error
                     .catch { emit(MainUiState.Error(it.message ?: "Unknown error")) }
+                    // stateIn convierte el flujo en un StateFlow, que siempre tiene un
+                    // valor actual disponible para la pantalla
                     .stateIn(
-                        scope = viewModelScope,
+                        scope = viewModelScope,  // se cancela solo al destruirse el ViewModel
+                        // WhileSubscribed(5_000): trabaja mientras la pantalla mira, y
+                        // sigue 5 segundos más. Así un giro de pantalla no reinicia la
+                        // carga, pero tampoco se gastan recursos en segundo plano.
                         started = SharingStarted.WhileSubscribed(5_000),
-                        initialValue = MainUiState.Loading
+                        initialValue = MainUiState.Loading  // lo que se ve al principio
                     )
 
-            // Avisos de una sola vez (snackbar): un StateFlow los repetiría al recomponer
+            /**
+             * Avisos de UNA SOLA VEZ (un snackbar). No van en el uiState porque un
+             * estado se vuelve a leer al recomponer o al girar, y el mensaje saldría
+             * una y otra vez. Un SharedFlow se consume una vez y ya está.
+             */
             private val _userMessages = MutableSharedFlow<String>()
             val userMessages: SharedFlow<String> = _userMessages.asSharedFlow()
 
+            // init se ejecuta al crear el ViewModel: primera carga desde la red
             init {
                 refresh()
             }
 
+            /** Evento del usuario: reintentar o refrescar. */
             fun refresh() {
+                // launch arranca una corrutina; si el ViewModel muere, se cancela sola
                 viewModelScope.launch {
                     refreshItemsUseCase()
                         .onSuccess { loadError.value = null }
                         .onFailure { error ->
                             val message = error.message ?: "Failed to load data"
                             val hasData = (uiState.value as? MainUiState.Success)?.items?.isNotEmpty() == true
-                            // Con datos en pantalla el fallo es un aviso puntual;
-                            // sin datos, es el estado de la pantalla
+                            // Con datos en pantalla, el fallo es un aviso puntual y la
+                            // lista se queda. Sin datos, el fallo ES la pantalla.
                             if (hasData) _userMessages.emit(message) else loadError.value = message
                         }
                 }
@@ -1013,16 +1328,31 @@ object FileTemplates {
         import $packageName.domain.model.Item
         import $packageName.ui.theme.AppTheme
 
-        /** Pantalla con estado: conecta el ViewModel con el contenido sin estado. */
+        /**
+         * PANTALLA CON ESTADO (stateful): habla con el ViewModel y le pasa los datos ya
+         * masticados al composable de abajo. Es la única parte que conoce Hilt.
+         *
+         * La pantalla se divide en dos a propósito: esta parte no se puede previsualizar
+         * (necesita un ViewModel real), pero MainContent sí.
+         */
         @Composable
         fun MainScreen(
             onItemClick: (Int) -> Unit,
             modifier: Modifier = Modifier,
+            // hiltViewModel() pide el ViewModel a Hilt, ya construido con sus casos de uso
             viewModel: MainViewModel = hiltViewModel()
         ) {
+            // collectAsStateWithLifecycle escucha el flujo del ViewModel y redibuja al
+            // cambiar. "WithLifecycle" = deja de escuchar si la pantalla no está visible,
+            // para no gastar batería.
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            // remember conserva el objeto entre redibujados; sin él se crearía uno nuevo
+            // en cada recomposición y el snackbar desaparecería
             val snackbarHostState = remember { SnackbarHostState() }
 
+            // LaunchedEffect lanza una corrutina ligada a la pantalla. Con Unit como
+            // clave, se ejecuta una sola vez, al entrar. Aquí escucha los avisos del
+            // ViewModel y los muestra como snackbar.
             LaunchedEffect(Unit) {
                 viewModel.userMessages.collect { message ->
                     snackbarHostState.showSnackbar(message)
@@ -1038,16 +1368,26 @@ object FileTemplates {
             )
         }
 
-        /** Contenido sin estado: previsualizable y testeable en aislamiento. */
+        /**
+         * CONTENIDO SIN ESTADO (stateless): recibe el estado ya calculado y devuelve
+         * los clics hacia arriba mediante lambdas. No guarda nada ni conoce el ViewModel.
+         *
+         * Este es el patrón "state down, events up" de Compose: el estado baja, los
+         * eventos suben. Un composable así se puede previsualizar y probar solo.
+         */
         @OptIn(ExperimentalMaterial3Api::class)
         @Composable
         fun MainContent(
             uiState: MainUiState,
             onItemClick: (Int) -> Unit,
             onRetry: () -> Unit,
+            // Modifier siempre como parámetro y con valor por defecto: permite a quien
+            // use el composable decidir tamaño, márgenes o posición desde fuera
             modifier: Modifier = Modifier,
             snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
         ) {
+            // Scaffold monta la estructura típica de Material3: barra superior, hueco
+            // para snackbars y el contenido
             Scaffold(
                 modifier = modifier,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -1057,11 +1397,15 @@ object FileTemplates {
                     )
                 }
             ) { innerPadding ->
+                // innerPadding es el espacio que ocupan las barras; hay que aplicarlo o
+                // el contenido quedará por debajo de ellas
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
+                    // El when sobre el estado decide QUÉ se pinta. Al ser una sealed
+                    // interface, el compilador avisa si falta algún caso.
                     when (val state = uiState) {
                         is MainUiState.Loading -> {
                             CircularProgressIndicator(
@@ -1084,15 +1428,23 @@ object FileTemplates {
                             }
                         }
                         is MainUiState.Success -> {
+                            // "Hay datos" incluye el caso de lista vacía, que merece su
+                            // propio mensaje y no un error
                             if (state.items.isEmpty()) {
                                 Text(
                                     text = "No items available.",
                                     modifier = Modifier.align(Alignment.Center)
                                 )
                             } else {
+                                // LazyColumn = lista que solo crea en memoria los
+                                // elementos visibles (el equivalente a RecyclerView)
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                    // key: identifica cada fila para que Compose sepa
+                                    // cuál es cuál al cambiar la lista y no redibuje de más
                                     items(state.items, key = { it.id }) { item ->
                                         Card(
+                                            // Card con onClick da la animación al pulsar
+                                            // y el rol de accesibilidad correctos
                                             onClick = { onItemClick(item.id) },
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -1118,6 +1470,12 @@ object FileTemplates {
                 }
             }
         }
+
+        /*
+         * PREVIEWS: se ven en el panel Design de Android Studio sin lanzar la app.
+         * Solo son posibles porque MainContent no depende del ViewModel: basta con
+         * inventarse un estado y pasárselo.
+         */
 
         @Preview(showBackground = true)
         @Composable
@@ -1225,23 +1583,40 @@ object FileTemplates {
         import org.junit.Test
         import java.io.IOException
 
+        /**
+         * Tests del MainViewModel. Se ejecutan en la JVM (segundos, sin emulador) con:
+         *
+         *   ./gradlew testDebugUnitTest
+         *
+         * Fíjate en que Hilt no aparece por ningún lado: como las dependencias se piden
+         * por constructor, el test las pasa a mano. Eso es una señal de buena arquitectura.
+         */
         class MainViewModelTest {
 
+            // La regla instala un dispatcher de prueba como Main. Sin ella, cualquier
+            // viewModelScope.launch falla con "Main dispatcher not initialized"
             @get:Rule
             val mainDispatcherRule = MainDispatcherRule()
 
             private val repository = FakeItemRepository()
 
+            // Los casos de uso son los REALES; lo único falso es el repositorio.
+            // Así el test comprueba la orquestación de verdad.
             private fun viewModel() = MainViewModel(
                 getItemsUseCase = GetItemsUseCase(repository),
                 refreshItemsUseCase = RefreshItemsUseCase(repository)
             )
 
+            // runTest ejecuta corrutinas en un tiempo simulado: nada de esperas reales
             @Test
             fun `exposes the items published by the repository`() = runTest {
                 repository.items.value = listOf(ITEM)
 
+                // .test { } es Turbine: colecciona el flujo y permite ir consumiendo
+                // sus emisiones una a una. Recuerda que con WhileSubscribed el flujo no
+                // arranca hasta que alguien lo colecciona: sin esto no habría estado.
                 viewModel().uiState.test {
+                    // expectMostRecentItem = "dame el último estado", ignorando intermedios
                     assertEquals(MainUiState.Success(listOf(ITEM)), expectMostRecentItem())
                     cancelAndIgnoreRemainingEvents()
                 }
@@ -1277,13 +1652,16 @@ object FileTemplates {
                 }
             }
 
+            /** Comprueba el camino datos -> UI: si cambian los datos, la pantalla cambia. */
             @Test
             fun `reacts to new data without any user action`() = runTest {
                 viewModel().uiState.test {
                     assertEquals(MainUiState.Success(emptyList()), expectMostRecentItem())
 
+                    // Nadie pulsa nada: solo cambian los datos guardados
                     repository.items.value = listOf(ITEM)
 
+                    // awaitItem = "exijo que llegue una emisión nueva"
                     assertEquals(MainUiState.Success(listOf(ITEM)), awaitItem())
                     cancelAndIgnoreRemainingEvents()
                 }
@@ -1311,6 +1689,10 @@ object FileTemplates {
         import org.junit.Assert.assertNull
         import org.junit.Test
 
+        /**
+         * Tests del caso de uso del detalle. Aquí no hace falta MainDispatcherRule:
+         * un caso de uso no tiene viewModelScope, es Kotlin puro.
+         */
         class GetItemUseCaseTest {
 
             private val repository = FakeItemRepository()
@@ -1402,6 +1784,7 @@ object FileTemplates {
         import androidx.compose.runtime.Composable
         import androidx.compose.ui.platform.LocalContext
 
+        // Paletas de color para modo claro y oscuro, construidas con los colores de Color.kt
         private val DarkColorScheme = darkColorScheme(
             primary = Purple80,
             secondary = PurpleGrey80,
@@ -1414,6 +1797,15 @@ object FileTemplates {
             tertiary = Pink40
         )
 
+        /**
+         * TEMA de la app: envuelve toda la interfaz y le da colores y tipografías.
+         * Cualquier composable de dentro puede consultarlos con MaterialTheme.
+         *
+         * @param darkTheme por defecto sigue el ajuste del sistema (modo oscuro).
+         * @param dynamicColor en Android 12+ toma los colores del fondo de pantalla
+         *        del usuario (Material You). Ponlo a false si tu app tiene colores
+         *        de marca que deben respetarse siempre.
+         */
         @Composable
         fun AppTheme(
             darkTheme: Boolean = isSystemInDarkTheme(),
@@ -1421,6 +1813,7 @@ object FileTemplates {
             content: @Composable () -> Unit
         ) {
             val colorScheme = when {
+                // VERSION_CODES.S = Android 12, la versión que trajo Material You
                 dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                     val context = LocalContext.current
                     if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

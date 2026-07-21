@@ -166,7 +166,7 @@ Si lo bajaste de GitHub como `.zip`, descomprímelo primero.
 
 4. **Encuentra el plugin ya compilado.** Se ha creado aquí:
    ```
-   build/distributions/AndroidStudioTemplate-1.0.2.zip
+   build/distributions/AndroidStudioTemplate-1.0.3.zip
    ```
    Ese `.zip` **es tu plugin**. (Debe pesar unos pocos KB; si pesa más de 1 MB, algo va
    mal — mira la Parte B, §8.1.)
@@ -550,7 +550,7 @@ JAVA_HOME=~/.local/share/JetBrains/Toolbox/apps/android-studio/jbr ./gradlew bui
 ```
 
 (El `JAVA_HOME` puede ser cualquier JDK 21; el JBR del propio Android Studio es el más
-a mano.) Resultado: `build/distributions/AndroidStudioTemplate-1.0.2.zip`.
+a mano.) Resultado: `build/distributions/AndroidStudioTemplate-1.0.3.zip`.
 
 El zip debe contener **solo tu jar** (aquí ~16 KB). Si ves dentro
 `kotlin-stdlib-*.jar`, olvidaste `kotlin.stdlib.default.dependency=false` y estás
