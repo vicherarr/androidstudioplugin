@@ -56,6 +56,11 @@ object FileTemplates {
         composeBom = "2025.06.00"
         hiltNavigationCompose = "1.2.0"
         navigationCompose = "2.9.1"
+        # Tests: versiones alineadas con las corrutinas que resuelve el proyecto (1.8.1),
+        # no con la última publicada (guías 41 y 42)
+        junit = "4.13.2"
+        coroutinesTest = "1.8.1"
+        turbine = "1.1.0"
 
         [libraries]
         androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -84,6 +89,10 @@ object FileTemplates {
         room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
         room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
+        junit = { group = "junit", name = "junit", version.ref = "junit" }
+        kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+        turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+
         [plugins]
         android-application = { id = "com.android.application", version.ref = "agp" }
         kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
@@ -95,6 +104,8 @@ object FileTemplates {
     """.trimIndent()
 
     fun getAppBuildGradleKts(packageName: String): String = """
+        import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
         plugins {
             alias(libs.plugins.android.application)
             alias(libs.plugins.kotlin.android)
@@ -121,7 +132,10 @@ object FileTemplates {
 
             buildTypes {
                 release {
-                    isMinifyEnabled = false
+                    // R8: elimina código muerto y ofusca; las reglas de Retrofit, Room y
+                    // kotlinx.serialization están en proguard-rules.pro
+                    isMinifyEnabled = true
+                    isShrinkResources = true
                     proguardFiles(
                         getDefaultProguardFile("proguard-android-optimize.txt"),
                         "proguard-rules.pro"
@@ -132,12 +146,15 @@ object FileTemplates {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
-            kotlinOptions {
-                jvmTarget = "17"
-            }
             buildFeatures {
                 compose = true
                 buildConfig = true
+            }
+        }
+
+        kotlin {
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_17)
             }
         }
 
@@ -175,7 +192,35 @@ object FileTemplates {
             // Room
             implementation(libs.room.runtime)
             ksp(libs.room.compiler)
+
+            // Tests unitarios (JVM): ViewModels y casos de uso sin emulador
+            testImplementation(libs.junit)
+            testImplementation(libs.kotlinx.coroutines.test)
+            testImplementation(libs.turbine)
         }
+    """.trimIndent()
+
+    // Reglas R8 para las librerías que usan reflexión o generación de código.
+    // kotlinx.serialization, Retrofit y Room ya aportan reglas de consumidor; aquí se
+    // refuerzan los puntos que dependen del código de la app (DTOs y rutas @Serializable).
+    fun getProguardRules(): String = """
+        # --- kotlinx.serialization (DTOs y rutas de navegación type-safe) ---
+        -keepattributes *Annotation*, InnerClasses, Signature
+        -keepclassmembers class **${'$'}${'$'}serializer { *; }
+        -if @kotlinx.serialization.Serializable class **
+        -keepclassmembers class <1> {
+            static <1>${'$'}Companion Companion;
+            public static ** INSTANCE;
+        }
+
+        # --- Retrofit / OkHttp ---
+        -keepattributes Exceptions
+        -keep,allowobfuscation,allowshrinking interface retrofit2.Call
+        -keep,allowobfuscation,allowshrinking class retrofit2.Response
+        -keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+
+        # --- Room ---
+        -keep class * extends androidx.room.RoomDatabase { <init>(); }
     """.trimIndent()
 
     fun getAndroidManifestXml(packageName: String): String = """
@@ -354,41 +399,57 @@ object FileTemplates {
         }
     """.trimIndent()
 
-    fun getItemRepositoryImplKt(packageName: String): String = """
+    fun getDefaultItemRepositoryKt(packageName: String): String = """
         package $packageName.data.repository
 
         import $packageName.data.local.dao.ItemDao
         import $packageName.data.local.entity.ItemEntity
         import $packageName.data.remote.api.ApiService
+        import $packageName.data.remote.dto.ItemDto
+        import $packageName.di.IoDispatcher
         import $packageName.domain.repository.ItemRepository
         import $packageName.domain.model.Item
+        import kotlinx.coroutines.CancellationException
+        import kotlinx.coroutines.CoroutineDispatcher
         import kotlinx.coroutines.flow.Flow
+        import kotlinx.coroutines.flow.flowOn
         import kotlinx.coroutines.flow.map
+        import kotlinx.coroutines.withContext
         import javax.inject.Inject
+        import javax.inject.Singleton
 
-        class ItemRepositoryImpl @Inject constructor(
+        /**
+         * Única fuente de verdad de los items: la base de datos manda y la red solo
+         * la refresca (offline-first).
+         */
+        @Singleton
+        class DefaultItemRepository @Inject constructor(
             private val apiService: ApiService,
-            private val itemDao: ItemDao
+            private val itemDao: ItemDao,
+            @IoDispatcher private val ioDispatcher: CoroutineDispatcher
         ) : ItemRepository {
 
             override fun getItems(): Flow<List<Item>> {
-                return itemDao.getItems().map { entities ->
-                    entities.map { it.toDomain() }
-                }
+                return itemDao.getItems()
+                    .map { entities -> entities.map { it.toDomain() } }
+                    .flowOn(ioDispatcher)
             }
 
             override fun getItem(id: Int): Flow<Item?> {
-                return itemDao.getItemById(id).map { entity -> entity?.toDomain() }
+                return itemDao.getItemById(id)
+                    .map { entity -> entity?.toDomain() }
+                    .flowOn(ioDispatcher)
             }
 
-            override suspend fun refreshItems(): Result<Unit> {
-                return try {
+            override suspend fun refreshItems(): Result<Unit> = withContext(ioDispatcher) {
+                try {
                     val remoteItems = apiService.getItems()
-                    val entities = remoteItems.map { dto ->
-                        ItemEntity(id = dto.id, title = dto.title, description = dto.description)
-                    }
-                    itemDao.insertItems(entities)
+                    itemDao.insertItems(remoteItems.map { it.toEntity() })
                     Result.success(Unit)
+                } catch (e: CancellationException) {
+                    // La cancelación no es un error: debe propagarse para que la
+                    // concurrencia estructurada funcione
+                    throw e
                 } catch (e: Exception) {
                     Result.failure(e)
                 }
@@ -396,6 +457,36 @@ object FileTemplates {
 
             private fun ItemEntity.toDomain(): Item =
                 Item(id = id, title = title, description = description)
+
+            private fun ItemDto.toEntity(): ItemEntity =
+                ItemEntity(id = id, title = title, description = description)
+        }
+    """.trimIndent()
+
+    // Dispatchers inyectados: permiten sustituirlos por un TestDispatcher en los tests
+    // en lugar de acoplar el código a Dispatchers.IO
+    fun getDispatcherModuleKt(packageName: String): String = """
+        package $packageName.di
+
+        import dagger.Module
+        import dagger.Provides
+        import dagger.hilt.InstallIn
+        import dagger.hilt.components.SingletonComponent
+        import kotlinx.coroutines.CoroutineDispatcher
+        import kotlinx.coroutines.Dispatchers
+        import javax.inject.Qualifier
+
+        @Qualifier
+        @Retention(AnnotationRetention.RUNTIME)
+        annotation class IoDispatcher
+
+        @Module
+        @InstallIn(SingletonComponent::class)
+        object DispatcherModule {
+
+            @Provides
+            @IoDispatcher
+            fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
         }
     """.trimIndent()
 
@@ -500,7 +591,7 @@ object FileTemplates {
     fun getRepositoryModuleKt(packageName: String): String = """
         package $packageName.di
 
-        import $packageName.data.repository.ItemRepositoryImpl
+        import $packageName.data.repository.DefaultItemRepository
         import $packageName.domain.repository.ItemRepository
         import dagger.Binds
         import dagger.Module
@@ -515,7 +606,7 @@ object FileTemplates {
             @Binds
             @Singleton
             abstract fun bindItemRepository(
-                impl: ItemRepositoryImpl
+                impl: DefaultItemRepository
             ): ItemRepository
         }
     """.trimIndent()
@@ -534,8 +625,19 @@ object FileTemplates {
             operator fun invoke(): Flow<List<Item>> {
                 return repository.getItems()
             }
+        }
+    """.trimIndent()
 
-            suspend fun refresh(): Result<Unit> {
+    fun getRefreshItemsUseCaseKt(packageName: String): String = """
+        package $packageName.domain.usecase
+
+        import $packageName.domain.repository.ItemRepository
+        import javax.inject.Inject
+
+        class RefreshItemsUseCase @Inject constructor(
+            private val repository: ItemRepository
+        ) {
+            suspend operator fun invoke(): Result<Unit> {
                 return repository.refreshItems()
             }
         }
@@ -688,19 +790,39 @@ object FileTemplates {
         import androidx.compose.runtime.getValue
         import androidx.compose.ui.Alignment
         import androidx.compose.ui.Modifier
+        import androidx.compose.ui.tooling.preview.Preview
         import androidx.compose.ui.unit.dp
         import androidx.hilt.navigation.compose.hiltViewModel
         import androidx.lifecycle.compose.collectAsStateWithLifecycle
+        import $packageName.domain.model.Item
+        import $packageName.ui.theme.AppTheme
 
-        @OptIn(ExperimentalMaterial3Api::class)
+        /** Pantalla con estado: conecta el ViewModel con el contenido sin estado. */
         @Composable
         fun DetailScreen(
             onNavigateBack: () -> Unit,
+            modifier: Modifier = Modifier,
             viewModel: DetailViewModel = hiltViewModel()
         ) {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+            DetailContent(
+                uiState = uiState,
+                onNavigateBack = onNavigateBack,
+                modifier = modifier
+            )
+        }
+
+        /** Contenido sin estado: previsualizable y testeable en aislamiento. */
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun DetailContent(
+            uiState: DetailUiState,
+            onNavigateBack: () -> Unit,
+            modifier: Modifier = Modifier
+        ) {
             Scaffold(
+                modifier = modifier,
                 topBar = {
                     TopAppBar(
                         title = { Text("Detail") },
@@ -756,6 +878,27 @@ object FileTemplates {
                 }
             }
         }
+
+        @Preview(showBackground = true)
+        @Composable
+        private fun DetailContentSuccessPreview() {
+            AppTheme {
+                DetailContent(
+                    uiState = DetailUiState.Success(
+                        Item(id = 1, title = "First item", description = "A longer description")
+                    ),
+                    onNavigateBack = {}
+                )
+            }
+        }
+
+        @Preview(showBackground = true)
+        @Composable
+        private fun DetailContentNotFoundPreview() {
+            AppTheme {
+                DetailContent(uiState = DetailUiState.NotFound, onNavigateBack = {})
+            }
+        }
     """.trimIndent()
 
     fun getMainUiStateKt(packageName: String): String = """
@@ -776,47 +919,62 @@ object FileTemplates {
         import androidx.lifecycle.ViewModel
         import androidx.lifecycle.viewModelScope
         import $packageName.domain.usecase.GetItemsUseCase
+        import $packageName.domain.usecase.RefreshItemsUseCase
         import dagger.hilt.android.lifecycle.HiltViewModel
+        import kotlinx.coroutines.flow.MutableSharedFlow
         import kotlinx.coroutines.flow.MutableStateFlow
+        import kotlinx.coroutines.flow.SharedFlow
+        import kotlinx.coroutines.flow.SharingStarted
         import kotlinx.coroutines.flow.StateFlow
-        import kotlinx.coroutines.flow.asStateFlow
+        import kotlinx.coroutines.flow.asSharedFlow
         import kotlinx.coroutines.flow.catch
+        import kotlinx.coroutines.flow.combine
+        import kotlinx.coroutines.flow.stateIn
         import kotlinx.coroutines.launch
         import javax.inject.Inject
 
         @HiltViewModel
         class MainViewModel @Inject constructor(
-            private val getItemsUseCase: GetItemsUseCase
+            getItemsUseCase: GetItemsUseCase,
+            private val refreshItemsUseCase: RefreshItemsUseCase
         ) : ViewModel() {
 
-            private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading)
-            val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+            private val loadError = MutableStateFlow<String?>(null)
+
+            val uiState: StateFlow<MainUiState> =
+                combine(getItemsUseCase(), loadError) { items, error ->
+                    if (items.isEmpty() && error != null) {
+                        MainUiState.Error(error)
+                    } else {
+                        MainUiState.Success(items)
+                    }
+                }
+                    .catch { emit(MainUiState.Error(it.message ?: "Unknown error")) }
+                    .stateIn(
+                        scope = viewModelScope,
+                        started = SharingStarted.WhileSubscribed(5_000),
+                        initialValue = MainUiState.Loading
+                    )
+
+            // Avisos de una sola vez (snackbar): un StateFlow los repetiría al recomponer
+            private val _userMessages = MutableSharedFlow<String>()
+            val userMessages: SharedFlow<String> = _userMessages.asSharedFlow()
 
             init {
-                observeItems()
-                refreshData()
+                refresh()
             }
 
-            private fun observeItems() {
+            fun refresh() {
                 viewModelScope.launch {
-                    getItemsUseCase()
-                        .catch { _uiState.value = MainUiState.Error(it.message ?: "Unknown error") }
-                        .collect { items ->
-                            _uiState.value = MainUiState.Success(items)
+                    refreshItemsUseCase()
+                        .onSuccess { loadError.value = null }
+                        .onFailure { error ->
+                            val message = error.message ?: "Failed to load data"
+                            val hasData = (uiState.value as? MainUiState.Success)?.items?.isNotEmpty() == true
+                            // Con datos en pantalla el fallo es un aviso puntual;
+                            // sin datos, es el estado de la pantalla
+                            if (hasData) _userMessages.emit(message) else loadError.value = message
                         }
-                }
-            }
-
-            fun refreshData() {
-                viewModelScope.launch {
-                    val result = getItemsUseCase.refresh()
-                    if (result.isFailure) {
-                        if (_uiState.value is MainUiState.Loading) {
-                            _uiState.value = MainUiState.Error(
-                                result.exceptionOrNull()?.message ?: "Failed to load data"
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -825,7 +983,6 @@ object FileTemplates {
     fun getMainScreenKt(packageName: String, appName: String): String = """
         package $packageName.ui.main
 
-        import androidx.compose.foundation.clickable
         import androidx.compose.foundation.layout.Box
         import androidx.compose.foundation.layout.Column
         import androidx.compose.foundation.layout.Spacer
@@ -841,25 +998,61 @@ object FileTemplates {
         import androidx.compose.material3.ExperimentalMaterial3Api
         import androidx.compose.material3.MaterialTheme
         import androidx.compose.material3.Scaffold
+        import androidx.compose.material3.SnackbarHost
+        import androidx.compose.material3.SnackbarHostState
         import androidx.compose.material3.Text
         import androidx.compose.material3.TopAppBar
         import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.LaunchedEffect
         import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.remember
         import androidx.compose.ui.Alignment
         import androidx.compose.ui.Modifier
+        import androidx.compose.ui.tooling.preview.Preview
         import androidx.compose.ui.unit.dp
         import androidx.hilt.navigation.compose.hiltViewModel
         import androidx.lifecycle.compose.collectAsStateWithLifecycle
+        import $packageName.domain.model.Item
+        import $packageName.ui.theme.AppTheme
 
-        @OptIn(ExperimentalMaterial3Api::class)
+        /** Pantalla con estado: conecta el ViewModel con el contenido sin estado. */
         @Composable
         fun MainScreen(
             onItemClick: (Int) -> Unit,
+            modifier: Modifier = Modifier,
             viewModel: MainViewModel = hiltViewModel()
         ) {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val snackbarHostState = remember { SnackbarHostState() }
 
+            LaunchedEffect(Unit) {
+                viewModel.userMessages.collect { message ->
+                    snackbarHostState.showSnackbar(message)
+                }
+            }
+
+            MainContent(
+                uiState = uiState,
+                onItemClick = onItemClick,
+                onRetry = viewModel::refresh,
+                snackbarHostState = snackbarHostState,
+                modifier = modifier
+            )
+        }
+
+        /** Contenido sin estado: previsualizable y testeable en aislamiento. */
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun MainContent(
+            uiState: MainUiState,
+            onItemClick: (Int) -> Unit,
+            onRetry: () -> Unit,
+            modifier: Modifier = Modifier,
+            snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+        ) {
             Scaffold(
+                modifier = modifier,
+                snackbarHost = { SnackbarHost(snackbarHostState) },
                 topBar = {
                     TopAppBar(
                         title = { Text("$appName") }
@@ -887,7 +1080,7 @@ object FileTemplates {
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.refreshData() }) {
+                                Button(onClick = onRetry) {
                                     Text("Retry")
                                 }
                             }
@@ -902,10 +1095,10 @@ object FileTemplates {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                                     items(state.items, key = { it.id }) { item ->
                                         Card(
+                                            onClick = { onItemClick(item.id) },
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                                                .clickable { onItemClick(item.id) }
                                         ) {
                                             Column(modifier = Modifier.padding(16.dp)) {
                                                 Text(
@@ -925,6 +1118,241 @@ object FileTemplates {
                         }
                     }
                 }
+            }
+        }
+
+        @Preview(showBackground = true)
+        @Composable
+        private fun MainContentSuccessPreview() {
+            AppTheme {
+                MainContent(
+                    uiState = MainUiState.Success(
+                        items = listOf(
+                            Item(id = 1, title = "First item", description = "A short description"),
+                            Item(id = 2, title = "Second item", description = "Another description")
+                        )
+                    ),
+                    onItemClick = {},
+                    onRetry = {}
+                )
+            }
+        }
+
+        @Preview(showBackground = true)
+        @Composable
+        private fun MainContentErrorPreview() {
+            AppTheme {
+                MainContent(
+                    uiState = MainUiState.Error("No internet connection"),
+                    onItemClick = {},
+                    onRetry = {}
+                )
+            }
+        }
+    """.trimIndent()
+
+    // ---------------------------------------------------------------------------
+    // Tests unitarios (JVM). Patrón oficial: dispatcher de Main sustituido por regla
+    // de JUnit, fakes solo en la frontera de datos y Turbine sobre los StateFlow.
+    // ---------------------------------------------------------------------------
+
+    fun getMainDispatcherRuleKt(packageName: String): String = """
+        package $packageName.testutil
+
+        import kotlinx.coroutines.Dispatchers
+        import kotlinx.coroutines.ExperimentalCoroutinesApi
+        import kotlinx.coroutines.test.TestDispatcher
+        import kotlinx.coroutines.test.UnconfinedTestDispatcher
+        import kotlinx.coroutines.test.resetMain
+        import kotlinx.coroutines.test.setMain
+        import org.junit.rules.TestWatcher
+        import org.junit.runner.Description
+
+        /**
+         * viewModelScope vive en Dispatchers.Main, que no existe en la JVM: esta regla
+         * lo sustituye por un dispatcher de test antes de cada caso y lo restaura después.
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        class MainDispatcherRule(
+            private val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
+        ) : TestWatcher() {
+
+            override fun starting(description: Description) = Dispatchers.setMain(testDispatcher)
+
+            override fun finished(description: Description) = Dispatchers.resetMain()
+        }
+    """.trimIndent()
+
+    fun getFakeItemRepositoryKt(packageName: String): String = """
+        package $packageName.testutil
+
+        import $packageName.domain.model.Item
+        import $packageName.domain.repository.ItemRepository
+        import kotlinx.coroutines.flow.Flow
+        import kotlinx.coroutines.flow.MutableStateFlow
+        import kotlinx.coroutines.flow.map
+
+        /**
+         * Fake en la frontera de datos: los casos de uso reales se ejecutan encima, así
+         * el test prueba la orquestación de verdad y no un ViewModel de mentira.
+         */
+        class FakeItemRepository : ItemRepository {
+
+            val items = MutableStateFlow<List<Item>>(emptyList())
+
+            /** El test decide qué devuelve el refresco (éxito o fallo). */
+            var refreshResult: () -> Result<Unit> = { Result.success(Unit) }
+
+            override fun getItems(): Flow<List<Item>> = items
+
+            override fun getItem(id: Int): Flow<Item?> =
+                items.map { list -> list.firstOrNull { it.id == id } }
+
+            override suspend fun refreshItems(): Result<Unit> = refreshResult()
+        }
+    """.trimIndent()
+
+    fun getMainViewModelTestKt(packageName: String): String = """
+        package $packageName.ui.main
+
+        import app.cash.turbine.test
+        import $packageName.domain.model.Item
+        import $packageName.domain.usecase.GetItemsUseCase
+        import $packageName.domain.usecase.RefreshItemsUseCase
+        import $packageName.testutil.FakeItemRepository
+        import $packageName.testutil.MainDispatcherRule
+        import kotlinx.coroutines.test.runTest
+        import org.junit.Assert.assertEquals
+        import org.junit.Rule
+        import org.junit.Test
+        import java.io.IOException
+
+        class MainViewModelTest {
+
+            @get:Rule
+            val mainDispatcherRule = MainDispatcherRule()
+
+            private val repository = FakeItemRepository()
+
+            private fun viewModel() = MainViewModel(
+                getItemsUseCase = GetItemsUseCase(repository),
+                refreshItemsUseCase = RefreshItemsUseCase(repository)
+            )
+
+            @Test
+            fun `exposes the items published by the repository`() = runTest {
+                repository.items.value = listOf(ITEM)
+
+                viewModel().uiState.test {
+                    assertEquals(MainUiState.Success(listOf(ITEM)), expectMostRecentItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            @Test
+            fun `shows an error state when the refresh fails and there is no data`() = runTest {
+                repository.refreshResult = { Result.failure(IOException("No connection")) }
+
+                viewModel().uiState.test {
+                    assertEquals(MainUiState.Error("No connection"), expectMostRecentItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            @Test
+            fun `keeps the data and warns the user when the refresh fails with data on screen`() = runTest {
+                repository.items.value = listOf(ITEM)
+                val viewModel = viewModel()
+
+                viewModel.uiState.test {
+                    assertEquals(MainUiState.Success(listOf(ITEM)), expectMostRecentItem())
+
+                    repository.refreshResult = { Result.failure(IOException("No connection")) }
+                    viewModel.userMessages.test {
+                        viewModel.refresh()
+                        assertEquals("No connection", awaitItem())
+                    }
+
+                    // La lista sigue en pantalla: el fallo no la sustituye por un error
+                    expectNoEvents()
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            @Test
+            fun `reacts to new data without any user action`() = runTest {
+                viewModel().uiState.test {
+                    assertEquals(MainUiState.Success(emptyList()), expectMostRecentItem())
+
+                    repository.items.value = listOf(ITEM)
+
+                    assertEquals(MainUiState.Success(listOf(ITEM)), awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            private companion object {
+                val ITEM = Item(id = 1, title = "Title", description = "Description")
+            }
+        }
+    """.trimIndent()
+
+    /**
+     * El detalle se prueba a la altura del caso de uso, no del ViewModel:
+     * `SavedStateHandle.toRoute()` decodifica la ruta con un `android.os.Bundle` real,
+     * que no existe en la JVM. Ese trozo corresponde a un test instrumentado.
+     */
+    fun getGetItemUseCaseTestKt(packageName: String): String = """
+        package $packageName.domain.usecase
+
+        import app.cash.turbine.test
+        import $packageName.domain.model.Item
+        import $packageName.testutil.FakeItemRepository
+        import kotlinx.coroutines.test.runTest
+        import org.junit.Assert.assertEquals
+        import org.junit.Assert.assertNull
+        import org.junit.Test
+
+        class GetItemUseCaseTest {
+
+            private val repository = FakeItemRepository()
+            private val getItem = GetItemUseCase(repository)
+
+            @Test
+            fun `emits the item matching the requested id`() = runTest {
+                repository.items.value = listOf(FIRST, SECOND)
+
+                getItem(id = 2).test {
+                    assertEquals(SECOND, awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            @Test
+            fun `emits null when no item has that id`() = runTest {
+                repository.items.value = listOf(FIRST)
+
+                getItem(id = 99).test {
+                    assertNull(awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            @Test
+            fun `re-emits when the stored items change`() = runTest {
+                getItem(id = 1).test {
+                    assertNull(awaitItem())
+
+                    repository.items.value = listOf(FIRST)
+
+                    assertEquals(FIRST, awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+            private companion object {
+                val FIRST = Item(id = 1, title = "First", description = "First description")
+                val SECOND = Item(id = 2, title = "Second", description = "Second description")
             }
         }
     """.trimIndent()
@@ -1102,6 +1530,22 @@ object FileTemplates {
         Screens never receive the `NavController`: they expose lambdas (`onItemClick`,
         `onNavigateBack`) and the `NavHost` decides where each event leads. This keeps the
         screens previewable, testable, and reusable.
+
+        ## Tests
+
+        ```bash
+        ./gradlew testDebugUnitTest
+        ```
+
+        JVM only — no emulator. The suite uses JUnit 4, `kotlinx-coroutines-test` and
+        Turbine, with `MainDispatcherRule` replacing `Dispatchers.Main` and
+        `FakeItemRepository` as the only fake: the use cases under test are the real ones,
+        so what gets verified is the actual orchestration.
+
+        > `DetailViewModel` is not covered here on purpose. `SavedStateHandle.toRoute()`
+        > decodes the route through a real `android.os.Bundle`, which does not exist in
+        > plain JVM tests, so that piece belongs in an instrumented test. Its logic is
+        > covered one layer below, in `GetItemUseCaseTest`.
 
     """.trimIndent()
 }

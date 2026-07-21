@@ -38,10 +38,24 @@ Cuando se crea un proyecto usando este plugin, se genera una arquitectura limpia
    - Ejemplo lista → detalle, con los argumentos leídos en el ViewModel vía
      `savedStateHandle.toRoute<ItemDetailRoute>()`.
 
-6. **Catálogo de versiones (`gradle/libs.versions.toml`)**
+6. **Tests unitarios listos para ejecutar (`./gradlew testDebugUnitTest`)**
+   - JUnit 4.13.2, `kotlinx-coroutines-test` 1.8.1 y Turbine 1.1.0 (versiones alineadas
+     con las corrutinas que resuelve el proyecto, guías 41 y 42).
+   - `MainDispatcherRule` sustituyendo `Dispatchers.Main` y `FakeItemRepository` como
+     único fake: los casos de uso bajo prueba son los reales.
+   - 7 tests que cubren estado, reactividad datos→UI y fallo de refresco.
+
+7. **Calidad de producción**
+   - Dispatchers inyectados con qualifier `@IoDispatcher` (sustituibles en tests).
+   - `flowOn` en la capa de datos y `CancellationException` propagada, no capturada.
+   - Composables divididos en *stateful* / *stateless* con `@Preview`.
+   - R8 activado en `release` (`isMinifyEnabled` + `isShrinkResources`) con reglas para
+     Retrofit, Room y `kotlinx.serialization`.
+
+8. **Catálogo de versiones (`gradle/libs.versions.toml`)**
    - Todas las versiones alineadas según las guías del proyecto `AprenderDesarrolloAndroid`.
 
-7. **Parámetros del asistente**
+9. **Parámetros del asistente**
    - Nombre del fichero de base de datos Room y URL base de Retrofit configurables al
      crear el proyecto.
 

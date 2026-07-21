@@ -34,7 +34,7 @@ object ProjectGenerator {
         // app module root
         val appDir = File(targetDir, "app")
         writeFile(File(appDir, "build.gradle.kts"), FileTemplates.getAppBuildGradleKts(packageName))
-        writeFile(File(appDir, "proguard-rules.pro"), "# Add proguard rules here\n")
+        writeFile(File(appDir, "proguard-rules.pro"), FileTemplates.getProguardRules())
 
         // app/src/main
         val mainDir = File(appDir, "src/main")
@@ -61,18 +61,20 @@ object ProjectGenerator {
         writeFile(File(codeDir, "data/remote/dto/ItemDto.kt"), FileTemplates.getItemDtoKt(packageName))
         writeFile(File(codeDir, "data/remote/api/ApiService.kt"), FileTemplates.getApiServiceKt(packageName))
 
-        writeFile(File(codeDir, "data/repository/ItemRepositoryImpl.kt"), FileTemplates.getItemRepositoryImplKt(packageName))
+        writeFile(File(codeDir, "data/repository/DefaultItemRepository.kt"), FileTemplates.getDefaultItemRepositoryKt(packageName))
 
         // DI layer
         writeFile(File(codeDir, "di/DatabaseModule.kt"), FileTemplates.getDatabaseModuleKt(packageName, dbName))
         writeFile(File(codeDir, "di/NetworkModule.kt"), FileTemplates.getNetworkModuleKt(packageName, baseUrl))
         writeFile(File(codeDir, "di/RepositoryModule.kt"), FileTemplates.getRepositoryModuleKt(packageName))
+        writeFile(File(codeDir, "di/DispatcherModule.kt"), FileTemplates.getDispatcherModuleKt(packageName))
 
         // Domain layer
         writeFile(File(codeDir, "domain/model/Item.kt"), FileTemplates.getItemKt(packageName))
         writeFile(File(codeDir, "domain/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemsUseCase.kt"), FileTemplates.getGetItemsUseCaseKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemUseCase.kt"), FileTemplates.getGetItemUseCaseKt(packageName))
+        writeFile(File(codeDir, "domain/usecase/RefreshItemsUseCase.kt"), FileTemplates.getRefreshItemsUseCaseKt(packageName))
 
         // UI layer
         writeFile(File(codeDir, "ui/navigation/AppDestinations.kt"), FileTemplates.getAppDestinationsKt(packageName))
@@ -89,6 +91,13 @@ object ProjectGenerator {
         writeFile(File(codeDir, "ui/theme/Color.kt"), FileTemplates.getColorKt(packageName))
         writeFile(File(codeDir, "ui/theme/Theme.kt"), FileTemplates.getThemeKt(packageName))
         writeFile(File(codeDir, "ui/theme/Type.kt"), FileTemplates.getTypeKt(packageName))
+
+        // app/src/test/java/<packagePath> — tests unitarios en la JVM
+        val testDir = File(appDir, "src/test/java/$packagePath")
+        writeFile(File(testDir, "testutil/MainDispatcherRule.kt"), FileTemplates.getMainDispatcherRuleKt(packageName))
+        writeFile(File(testDir, "testutil/FakeItemRepository.kt"), FileTemplates.getFakeItemRepositoryKt(packageName))
+        writeFile(File(testDir, "ui/main/MainViewModelTest.kt"), FileTemplates.getMainViewModelTestKt(packageName))
+        writeFile(File(testDir, "domain/usecase/GetItemUseCaseTest.kt"), FileTemplates.getGetItemUseCaseTestKt(packageName))
     }
 
     private fun writeFile(file: File, content: String) {
