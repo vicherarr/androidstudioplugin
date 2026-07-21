@@ -61,6 +61,9 @@ object ProjectGenerator {
         writeFile(File(codeDir, "data/remote/dto/ItemDto.kt"), FileTemplates.getItemDtoKt(packageName))
         writeFile(File(codeDir, "data/remote/api/ApiService.kt"), FileTemplates.getApiServiceKt(packageName))
 
+        // El contrato del repositorio vive en la capa de datos, junto a su implementación:
+        // es la capa dueña de los datos y el dominio depende de ella
+        writeFile(File(codeDir, "data/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "data/repository/DefaultItemRepository.kt"), FileTemplates.getDefaultItemRepositoryKt(packageName))
 
         // DI layer
@@ -71,7 +74,6 @@ object ProjectGenerator {
 
         // Domain layer
         writeFile(File(codeDir, "domain/model/Item.kt"), FileTemplates.getItemKt(packageName))
-        writeFile(File(codeDir, "domain/repository/ItemRepository.kt"), FileTemplates.getItemRepositoryKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemsUseCase.kt"), FileTemplates.getGetItemsUseCaseKt(packageName))
         writeFile(File(codeDir, "domain/usecase/GetItemUseCase.kt"), FileTemplates.getGetItemUseCaseKt(packageName))
         writeFile(File(codeDir, "domain/usecase/RefreshItemsUseCase.kt"), FileTemplates.getRefreshItemsUseCaseKt(packageName))

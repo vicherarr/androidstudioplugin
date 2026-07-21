@@ -501,17 +501,21 @@ object FileTemplates {
     """.trimIndent()
 
     fun getItemRepositoryKt(packageName: String): String = """
-        package $packageName.domain.repository
+        package $packageName.data.repository
 
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
 
         /**
          * CONTRATO del repositorio: qué se puede pedir sobre los items, sin decir cómo
-         * se consigue. La implementación real está en data/repository/.
+         * se consigue. La implementación es DefaultItemRepository, en este mismo paquete.
          *
          * ¿Por qué una interfaz? Porque quien la usa (los casos de uso) no depende de
          * Room ni de Retrofit, y en los tests se puede sustituir por una versión falsa.
+         *
+         * Vive en la capa de DATOS, no en domain: según la arquitectura recomendada,
+         * el repositorio pertenece a la capa que es dueña de los datos, y el dominio
+         * (los casos de uso) depende de él.
          */
         interface ItemRepository {
 
@@ -537,7 +541,6 @@ object FileTemplates {
         import $packageName.data.remote.api.ApiService
         import $packageName.data.remote.dto.ItemDto
         import $packageName.di.IoDispatcher
-        import $packageName.domain.repository.ItemRepository
         import $packageName.domain.model.Item
         import kotlinx.coroutines.CancellationException
         import kotlinx.coroutines.CoroutineDispatcher
@@ -787,7 +790,7 @@ object FileTemplates {
         package $packageName.di
 
         import $packageName.data.repository.DefaultItemRepository
-        import $packageName.domain.repository.ItemRepository
+        import $packageName.data.repository.ItemRepository
         import dagger.Binds
         import dagger.Module
         import dagger.hilt.InstallIn
@@ -817,7 +820,7 @@ object FileTemplates {
     fun getGetItemsUseCaseKt(packageName: String): String = """
         package $packageName.domain.usecase
 
-        import $packageName.domain.repository.ItemRepository
+        import $packageName.data.repository.ItemRepository
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
         import javax.inject.Inject
@@ -843,7 +846,7 @@ object FileTemplates {
     fun getRefreshItemsUseCaseKt(packageName: String): String = """
         package $packageName.domain.usecase
 
-        import $packageName.domain.repository.ItemRepository
+        import $packageName.data.repository.ItemRepository
         import javax.inject.Inject
 
         /**
@@ -864,7 +867,7 @@ object FileTemplates {
     fun getGetItemUseCaseKt(packageName: String): String = """
         package $packageName.domain.usecase
 
-        import $packageName.domain.repository.ItemRepository
+        import $packageName.data.repository.ItemRepository
         import $packageName.domain.model.Item
         import kotlinx.coroutines.flow.Flow
         import javax.inject.Inject
@@ -1543,7 +1546,7 @@ object FileTemplates {
         package $packageName.testutil
 
         import $packageName.domain.model.Item
-        import $packageName.domain.repository.ItemRepository
+        import $packageName.data.repository.ItemRepository
         import kotlinx.coroutines.flow.Flow
         import kotlinx.coroutines.flow.MutableStateFlow
         import kotlinx.coroutines.flow.map
@@ -1897,14 +1900,17 @@ object FileTemplates {
         - **Data Layer**:
           - **Local**: Room Database, DAOs, Entities with KSP.
           - **Remote**: Retrofit, OkHttp Logging Interceptor, `kotlinx.serialization`.
-          - **Repository**: Single source of truth coordinating local and remote sources.
+          - **Repository**: contract and implementation, single source of truth
+            coordinating local and remote sources.
         - **DI**: Dagger Hilt for dependency injection.
 
         ## Package Structure
         `$packageName`
-        - `data/`: Repository implementations, DAOs, Database, Entities, API Service, DTOs
-        - `di/`: Hilt modules (`DatabaseModule`, `NetworkModule`, `RepositoryModule`)
-        - `domain/`: Business models, Repository interfaces, and UseCases
+        - `data/`: Repository (contract + implementation), DAOs, Database, Entities,
+          API Service, DTOs
+        - `di/`: Hilt modules (`DatabaseModule`, `NetworkModule`, `RepositoryModule`,
+          `DispatcherModule`)
+        - `domain/`: Business models and UseCases
         - `ui/`: Compose Screens, ViewModels, UiState, Theme
         - `ui/navigation/`: `AppDestinations` (rutas `@Serializable`) and `AppNavHost` (nav graph)
 
