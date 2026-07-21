@@ -4,7 +4,13 @@ import java.io.File
 
 object ProjectGenerator {
 
-    fun generate(targetDir: File, appName: String, packageName: String) {
+    fun generate(
+        targetDir: File,
+        appName: String,
+        packageName: String,
+        dbName: String = "app_database.db",
+        baseUrl: String = "https://jsonplaceholder.typicode.com/"
+    ) {
         if (!targetDir.exists()) {
             targetDir.mkdirs()
         }
@@ -58,8 +64,8 @@ object ProjectGenerator {
         writeFile(File(codeDir, "data/repository/ItemRepositoryImpl.kt"), FileTemplates.getItemRepositoryImplKt(packageName))
 
         // DI layer
-        writeFile(File(codeDir, "di/DatabaseModule.kt"), FileTemplates.getDatabaseModuleKt(packageName))
-        writeFile(File(codeDir, "di/NetworkModule.kt"), FileTemplates.getNetworkModuleKt(packageName))
+        writeFile(File(codeDir, "di/DatabaseModule.kt"), FileTemplates.getDatabaseModuleKt(packageName, dbName))
+        writeFile(File(codeDir, "di/NetworkModule.kt"), FileTemplates.getNetworkModuleKt(packageName, baseUrl))
         writeFile(File(codeDir, "di/RepositoryModule.kt"), FileTemplates.getRepositoryModuleKt(packageName))
 
         // Domain layer

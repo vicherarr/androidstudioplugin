@@ -1,12 +1,15 @@
 package com.aprender.template.wizard
 
 import com.android.tools.idea.wizard.template.Category
+import com.android.tools.idea.wizard.template.Constraint
 import com.android.tools.idea.wizard.template.FormFactor
 import com.android.tools.idea.wizard.template.ModuleTemplateData
 import com.android.tools.idea.wizard.template.Template
 import com.android.tools.idea.wizard.template.TemplateData
+import com.android.tools.idea.wizard.template.TextFieldWidget
 import com.android.tools.idea.wizard.template.WizardTemplateProvider
 import com.android.tools.idea.wizard.template.WizardUiContext
+import com.android.tools.idea.wizard.template.stringParameter
 import com.android.tools.idea.wizard.template.template
 import com.aprender.template.generator.ProjectGenerator
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -18,6 +21,20 @@ class AndroidStudioWizardTemplateProvider : WizardTemplateProvider() {
     }
 }
 
+val dbNameParam = stringParameter {
+    name = "Database Name"
+    default = "app_database.db"
+    help = "The name of the Room database file"
+    constraints = listOf(Constraint.NONEMPTY)
+}
+
+val baseUrlParam = stringParameter {
+    name = "Retrofit Base URL"
+    default = "https://jsonplaceholder.typicode.com/"
+    help = "The base URL for Retrofit API calls"
+    constraints = listOf(Constraint.NONEMPTY)
+}
+
 val androidHiltRetrofitRoomTemplate: Template
     get() = template {
         name = "Android (Hilt + Retrofit + Room)"
@@ -26,6 +43,11 @@ val androidHiltRetrofitRoomTemplate: Template
         category = Category.Application
         formFactor = FormFactor.Mobile
         screens = listOf(WizardUiContext.NewProject)
+
+        widgets(
+            TextFieldWidget(dbNameParam),
+            TextFieldWidget(baseUrlParam)
+        )
 
         recipe = { data: TemplateData ->
             val moduleData = data as ModuleTemplateData
@@ -43,7 +65,9 @@ val androidHiltRetrofitRoomTemplate: Template
                 ProjectGenerator.generate(
                     targetDir = rootDir,
                     appName = moduleData.themesData.appName,
-                    packageName = moduleData.packageName
+                    packageName = moduleData.packageName,
+                    dbName = dbNameParam.value,
+                    baseUrl = baseUrlParam.value
                 )
 
                 // Los ficheros se escriben con java.io fuera del VFS; hay que marcar el
@@ -58,3 +82,4 @@ val androidHiltRetrofitRoomTemplate: Template
             }
         }
     }
+

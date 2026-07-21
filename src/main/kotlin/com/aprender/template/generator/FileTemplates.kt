@@ -380,7 +380,7 @@ object FileTemplates {
         }
     """.trimIndent()
 
-    fun getDatabaseModuleKt(packageName: String): String = """
+    fun getDatabaseModuleKt(packageName: String, dbName: String = "app_database.db"): String = """
         package $packageName.di
 
         import android.content.Context
@@ -404,7 +404,7 @@ object FileTemplates {
                 return Room.databaseBuilder(
                     context,
                     AppDatabase::class.java,
-                    "app_database.db"
+                    "$dbName"
                 ).build()
             }
 
@@ -415,7 +415,7 @@ object FileTemplates {
         }
     """.trimIndent()
 
-    fun getNetworkModuleKt(packageName: String): String = """
+    fun getNetworkModuleKt(packageName: String, baseUrl: String = "https://jsonplaceholder.typicode.com/"): String = """
         package $packageName.di
 
         import $packageName.BuildConfig
@@ -437,7 +437,7 @@ object FileTemplates {
         @InstallIn(SingletonComponent::class)
         object NetworkModule {
 
-            private const val BASE_URL = "https://jsonplaceholder.typicode.com/"
+            private const val BASE_URL = "$baseUrl"
 
             @Provides
             @Singleton
